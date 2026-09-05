@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Carnet d'atelier — Théâtre</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #fbf8f4;
+    --surface: #ffffff;
+    --surface-alt: #f3eee7;
+    --border: #e4dacc;
+    --text: #241c15;
+    --text-muted: #7a6e5f;
+    --accent: #0284c7;
+    --accent-strong: #0369a1;
+    --accent-contrast: #ffffff;
+    --gold: #a5721f;
+    --gold-soft: #f1e2c4;
+    --green: #2f7a52;
+    --green-soft: #dcefe2;
+    --red: #b23a35;
+    --red-soft: #f6dedc;
+    --shadow: 0 1px 2px rgba(36, 28, 21, 0.06), 0 4px 16px rgba(36, 28, 21, 0.06);
+    --radius: 10px;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17130f;
+      --surface: #211b16;
+      --surface-alt: #2a231d;
+      --border: #3a322a;
+      --text: #f2eae0;
+      --text-muted: #a99c8a;
+      --accent: #38bdf8;
+      --accent-strong: #7dd3fc;
+      --accent-contrast: #062a3d;
+      --gold: #e3ac55;
+      --gold-soft: #3c2f18;
+      --green: #63be8b;
+      --green-soft: #1c3527;
+      --red: #e2716b;
+      --red-soft: #3a2220;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17130f; --surface: #211b16; --surface-alt: #2a231d; --border: #3a322a;
+    --text: #f2eae0; --text-muted: #a99c8a; --accent: #38bdf8; --accent-strong: #7dd3fc;
+    --accent-contrast: #062a3d; --gold: #e3ac55; --gold-soft: #3c2f18;
+    --green: #63be8b; --green-soft: #1c3527; --red: #e2716b; --red-soft: #3a2220;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbf8f4; --surface: #ffffff; --surface-alt: #f3eee7; --border: #e4dacc;
+    --text: #241c15; --text-muted: #7a6e5f; --accent: #0284c7; --accent-strong: #0369a1;
+    --accent-contrast: #ffffff; --gold: #a5721f; --gold-soft: #f1e2c4;
+    --green: #2f7a52; --green-soft: #dcefe2; --red: #b23a35; --red-soft: #f6dedc;
+    --shadow: 0 1px 2px rgba(36, 28, 21, 0.06), 0 4px 16px rgba(36, 28, 21, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 980px; margin: 0 auto; padding: 0 16px 80px; }
+  a { color: var(--accent); }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; }
+  button { font-family: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  /* ---------- Header ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 980px; margin: 0 auto; padding: 14px 16px 12px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .brand svg { flex: none; }
+  .brand-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; letter-spacing: 0.2px; }
+  .year-select {
+    appearance: none; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font-mono); font-size: 13px; padding: 7px 28px 7px 10px; border-radius: 8px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a6e5f'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); padding: 7px 13px; border-radius: 8px;
+    font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--text-muted); }
+  .btn-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+  .btn-accent:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+  .btn-ghost { border-color: transparent; background: transparent; }
+  .btn-ghost:hover { background: var(--surface-alt); }
+  .btn-danger { color: var(--red); }
+  .btn-sm { padding: 5px 10px; font-size: 12.5px; }
+  .btn[disabled] { opacity: 0.5; cursor: default; }
+
+  /* ---------- Group tabs strip ---------- */
+  .group-strip {
+    display: flex; gap: 8px; overflow-x: auto; padding: 2px 16px 14px; margin: 0 -16px;
+    max-width: 980px; margin-left: auto; margin-right: auto;
+  }
+  .group-strip::-webkit-scrollbar { height: 5px; }
+  .group-chip {
+    flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-muted); font-size: 13.5px; font-weight: 500;
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+  }
+  .group-chip.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+  .group-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+  .group-chip.archived { opacity: 0.55; font-style: italic; }
+
+  /* ---------- Layout bits ---------- */
+  .banner {
+    background: var(--red-soft); color: var(--red); border: 1px solid var(--red);
+    border-radius: var(--radius); padding: 10px 14px; margin: 14px 0; font-size: 13.5px;
+    display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 9px 18px; border-radius: 999px;
+    font-size: 13px; box-shadow: var(--shadow); z-index: 100; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--text-muted);
+  }
+  .empty-state h2 { color: var(--text); margin-bottom: 8px; font-size: 19px; }
+  .empty-state p { max-width: 40ch; margin: 0 auto 18px; font-size: 13.5px; }
+
+  .tabs { display: flex; gap: 4px; background: var(--surface-alt); border-radius: 10px; padding: 4px; margin: 4px 0 20px; width: fit-content; }
+  .tab-btn {
+    border: none; background: transparent; color: var(--text-muted); font-size: 13.5px; font-weight: 600;
+    padding: 7px 16px; border-radius: 7px; cursor: pointer;
+  }
+  .tab-btn.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .section-head h2 { font-size: 20px; }
+  .muted { color: var(--text-muted); }
+  .count-tag { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; box-shadow: var(--shadow);
+  }
+  .card + .card { margin-top: 10px; }
+
+  .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .student-card { cursor: pointer; text-align: left; border: 1px solid var(--border); background: var(--surface);
+    border-radius: var(--radius); padding: 13px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .student-card:hover { border-color: var(--accent); }
+  .student-name { font-family: var(--font-display); font-size: 16px; font-weight: 600; }
+  .student-meta { display: flex; gap: 8px; font-size: 12px; }
+  .pill { border-radius: 999px; padding: 2px 8px; font-family: var(--font-mono); font-weight: 600; }
+  .pill-green { background: var(--green-soft); color: var(--green); }
+  .pill-gold { background: var(--gold-soft); color: var(--gold); }
+  .pill-red { background: var(--red-soft); color: var(--red); }
+  .pill-muted { background: var(--surface-alt); color: var(--text-muted); }
+  .student-card.inactive { opacity: 0.55; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .field input, .field textarea, .field select {
+    font-family: var(--font-body); font-size: 14.5px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%;
+  }
+  .field textarea { resize: vertical; min-height: 70px; font-family: var(--font-body); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+  fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px 4px; margin: 0 0 16px; }
+  legend { font-family: var(--font-display); font-size: 14px; padding: 0 6px; color: var(--text-muted); }
+
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+
+  .contact-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+  .contact-line svg { flex: none; opacity: 0.6; }
+
+  .session-row {
+    display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .session-row:last-child { border-bottom: none; }
+  .session-row:hover .session-date { color: var(--accent); }
+  .session-date { font-family: var(--font-mono); font-weight: 700; min-width: 92px; }
+  .session-summary { flex: 1; min-width: 0; }
+  .session-content-preview { color: var(--text-muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .session-counts { display: flex; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; flex: none; }
+
+  .attend-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .attend-row:last-child { border-bottom: none; }
+  .attend-name { flex: 1; min-width: 130px; font-weight: 600; }
+  .status-toggle { display: flex; gap: 4px; }
+  .status-btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
+    font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+  }
+  .status-btn[data-status="present"].active { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+  .status-btn[data-status="retard"].active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+  .status-btn[data-status="absent"].active { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+  .retard-min { width: 64px; font-family: var(--font-mono); }
+
+  table.bilan { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.bilan th, table.bilan td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.bilan th { color: var(--text-muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; font-weight: 600; }
+  table.bilan td.num, table.bilan th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .bilan-wrap { overflow-x: auto; }
+  .bar-track { background: var(--surface-alt); border-radius: 4px; height: 6px; width: 80px; overflow: hidden; display: inline-block; vertical-align: middle; }
+  .bar-fill { height: 100%; background: var(--green); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20, 15, 10, 0.45); display: flex; align-items: flex-start;
+    justify-content: center; padding: 30px 14px; overflow-y: auto; z-index: 50;
+  }
+  .modal {
+    background: var(--surface); border-radius: 14px; max-width: 640px; width: 100%; padding: 22px 24px 24px;
+    box-shadow: var(--shadow); border: 1px solid var(--border);
+  }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 10px; }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: var(--text); }
+
+  .back-link { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 13px; margin-bottom: 14px; cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; }
+  .back-link:hover { color: var(--accent); }
+
+  .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+  .history-item { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .history-item:last-child { border-bottom: none; }
+
+  .inline-note { font-size: 12.5px; color: var(--text-muted); margin-top: -4px; margin-bottom: 12px; }
+
+  .lock-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .lock-card { max-width: 340px; width: 100%; text-align: center; }
+  .lock-card .brand { justify-content: center; margin-bottom: 4px; }
+  .lock-error { color: var(--red); font-size: 13px; margin: -6px 0 12px; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------
+  function uid() { return Math.random().toString(36).slice(2, 10); }
+  function upperNom(s) { return String(s == null ? "" : s).toUpperCase(); }
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function currentSchoolYear() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = d.getMonth(); // 0 = janvier
+    return m >= 7 ? (y + "-" + (y + 1)) : ((y - 1) + "-" + y);
+  }
+  function formatDateFR(iso) {
+    if (!iso) return "";
+    var p = iso.split("-");
+    if (p.length !== 3) return iso;
+    return p[2] + "/" + p[1] + "/" + p[0];
+  }
+  function dowShortFR(iso) {
+    var days = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"];
+    var d = new Date(iso + "T12:00:00");
+    if (isNaN(d.getTime())) return "";
+    return days[d.getDay()];
+  }
+  var toastTimer = null;
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  var ICONS = {
+    mask: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c-4 0-7 2-7 5 0 2 1 3 1 5 0 3 2.5 5 6 5s6-2 6-5c0-2 1-3 1-5 0-3-3-5-7-5Z"/><path d="M8.5 10.5c.5 1 1 1.3 1.5 0M14 10.5c.5 1 1 1.3 1.5 0M9 15c1 1 5 1 6 0"/></svg>',
+    phone: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21.1 2.9 13.4 2.9 3.1 2.9 2.5 3.4 2 4 2h3.3c.6 0 1.1.5 1.1 1.1 0 1.2.2 2.4.6 3.5.1.3 0 .7-.2 1L6.6 10.8Z"/></svg>',
+    mail: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="4.5" width="19" height="15" rx="2"/><path d="m3 6 9 6 9-6"/></svg>',
+    plus: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>'
+  };
+
+  // ---------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------
+  var state = {
+    db: null,
+    dbState: "connecting", // connecting | ready | unavailable
+    unlocked: localStorage.getItem("atelier.accessGranted") === "yes",
+    lockError: "",
+    groups: [],
+    students: [],
+    sessions: [],
+    year: localStorage.getItem("atelier.year") || currentSchoolYear(),
+    groupId: localStorage.getItem("atelier.groupId") || null,
+    tab: "eleves", // eleves | seances | bilan
+    studentFilter: "",
+    modal: null, // { type: 'student'|'group'|'session'|'confirm', ... }
+    unsub: { students: null, sessions: null }
+  };
+  var modalRenderedFor = null; // tracks which state.modal object the DOM currently reflects
+  var appClickBound = false;
+
+  function saveNav() {
+    localStorage.setItem("atelier.year", state.year);
+    if (state.groupId) localStorage.setItem("atelier.groupId", state.groupId);
+  }
+
+  // ---------------------------------------------------------------------
+  // DB wiring (Firebase Firestore)
+  // ---------------------------------------------------------------------
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBRiemeOkj1bGuOk2295tYAqN7bmntdnC8",
+    authDomain: "carnet-atelier-theatre.firebaseapp.com",
+    projectId: "carnet-atelier-theatre",
+    storageBucket: "carnet-atelier-theatre.firebasestorage.app",
+    messagingSenderId: "770509225064",
+    appId: "1:770509225064:web:8158edf6786bd6067e0fdd"
+  };
+
+  function exportAllData() {
+    if (!state.db) { showToast("Connexion indisponible."); return; }
+    Promise.all([
+      state.db.collection("groups").get(),
+      state.db.collection("students").get(),
+      state.db.collection("sessions").get()
+    ]).then(function (res) {
+      var bundle = {
+        exportedAt: new Date().toISOString(),
+        groups: res[0].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }),
+        students: res[1].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }),
+        sessions: res[2].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+      };
+      var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "carnet-atelier-export.json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Export enregistré");
+    }).catch(function () { showToast("Échec de l'export"); });
+  }
+
+  function initDb() {
+    try {
+      if (!window.firebase) { state.dbState = "unavailable"; render(); return; }
+      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+      var db = firebase.firestore();
+      state.db = db;
+      state.dbState = "ready";
+      db.collection("groups").orderBy("nom", "asc").onSnapshot(function (snap) {
+        state.groups = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        if (!state.groupId) {
+          var firstInYear = state.groups.find(function (g) { return g.annee === state.year; });
+          if (firstInYear) state.groupId = firstInYear.id;
+        }
+        render();
+      }, function () { state.dbState = "unavailable"; render(); });
+      render();
+    } catch (e) {
+      state.dbState = "unavailable";
+      render();
+    }
+  }
+
+  function subscribeGroup(groupId) {
+    if (state.unsub.students) state.unsub.students();
+    if (state.unsub.sessions) state.unsub.sessions();
+    state.students = [];
+    state.sessions = [];
+    if (!groupId || !state.db) return;
+    state.unsub.students = state.db.collection("students").where("groupId", "==", groupId).onSnapshot(function (snap) {
+      state.students = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+        .sort(function (a, b) { return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"); });
+      render();
+    });
+    state.unsub.sessions = state.db.collection("sessions").where("groupId", "==", groupId).orderBy("date", "desc").onSnapshot(function (snap) {
+      state.sessions = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      render();
+    });
+  }
+
+  function selectGroup(id) {
+    state.groupId = id;
+    state.tab = "eleves";
+    saveNav();
+    subscribeGroup(id);
+    render();
+  }
+
+  // ---------------------------------------------------------------------
+  // Derived data helpers
+  // ---------------------------------------------------------------------
+  function groupsForYear(year) {
+    return state.groups.filter(function (g) { return g.annee === year; });
+  }
+  function allYears() {
+    var set = {};
+    state.groups.forEach(function (g) { set[g.annee] = true; });
+    set[currentSchoolYear()] = true;
+    set[state.year] = true;
+    return Object.keys(set).sort().reverse();
+  }
+  function currentGroup() {
+    return state.groups.find(function (g) { return g.id === state.groupId; }) || null;
+  }
+  function studentById(id) {
+    return state.students.find(function (s) { return s.id === id; });
+  }
+  function statsForStudent(studentId) {
+    var present = 0, retard = 0, absent = 0, minutes = 0, total = 0;
+    state.sessions.forEach(function (s) {
+      var p = s.presences && s.presences[studentId];
+      if (!p) return;
+      total++;
+      if (p.statut === "present") present++;
+      else if (p.statut === "retard") { retard++; minutes += Number(p.minutesRetard) || 0; }
+      else if (p.statut === "absent") absent++;
+    });
+    var rate = total ? Math.round(((present + retard) / total) * 100) : null;
+    return { present: present, retard: retard, absent: absent, minutes: minutes, total: total, rate: rate };
+  }
+
+  // ---------------------------------------------------------------------
+  // Mutations
+  // ---------------------------------------------------------------------
+  function requireDb() {
+    if (state.dbState !== "ready" || !state.db) { showToast("Connexion indisponible — réessayez dans un instant."); return null; }
+    return state.db;
+  }
+
+  function createGroup(data) {
+    var db = requireDb(); if (!db) return;
+    db.collection("groups").add({
+      nom: data.nom, annee: data.annee, ville: data.ville || "", archive: false, creeLe: new Date().toISOString()
+    }).then(function (ref) {
+      showToast("Groupe créé");
+      selectGroup(ref.id);
+    });
+  }
+  function updateGroup(id, patch) {
+    var db = requireDb(); if (!db) return;
+    db.collection("groups").doc(id).update(patch).then(function () { showToast("Groupe mis à jour"); });
+  }
+  function archiveGroup(id, archive) {
+    updateGroup(id, { archive: !!archive });
+  }
+  function deleteGroupCascade(id) {
+    var db = requireDb(); if (!db) return;
+    Promise.all([
+      db.collection("students").where("groupId", "==", id).get(),
+      db.collection("sessions").where("groupId", "==", id).get()
+    ]).then(function (res) {
+      var deletes = [];
+      res[0].docs.forEach(function (d) { deletes.push(db.collection("students").doc(d.id).delete()); });
+      res[1].docs.forEach(function (d) { deletes.push(db.collection("sessions").doc(d.id).delete()); });
+      deletes.push(db.collection("groups").doc(id).delete());
+      return Promise.all(deletes);
+    }).then(function () {
+      showToast("Groupe supprimé");
+      if (state.groupId === id) { state.groupId = null; subscribeGroup(null); }
+      render();
+    });
+  }
+  function duplicateGroupToYear(group, newYear, newName, carryStudents) {
+    var db = requireDb(); if (!db) return;
+    db.collection("groups").add({ nom: newName, ville: group.ville || "", annee: newYear, archive: false, creeLe: new Date().toISOString() })
+      .then(function (ref) {
+        if (!carryStudents) { showToast("Nouveau groupe créé"); state.year = newYear; selectGroup(ref.id); saveNav(); return; }
+        db.collection("students").where("groupId", "==", group.id).get().then(function (snap) {
+          var copies = snap.docs.filter(function (d) { return d.data().actif !== false; }).map(function (d) {
+            var data = Object.assign({}, d.data());
+            data.groupId = ref.id;
+            data.creeLe = new Date().toISOString();
+            return db.collection("students").add(data);
+          });
+          Promise.all(copies).then(function () {
+            showToast("Groupe et élèves reconduits pour " + newYear);
+            state.year = newYear;
+            selectGroup(ref.id);
+            saveNav();
+          });
+        });
+      });
+  }
+
+  function createStudent(data) {
+    var db = requireDb(); if (!db) return;
+    data.groupId = state.groupId;
+    data.actif = true;
+    data.creeLe = new Date().toISOString();
+    db.collection("students").add(data).then(function () { showToast("Élève ajouté"); });
+  }
+  function updateStudent(id, patch) {
+    var db = requireDb(); if (!db) return;
+    db.collection("students").doc(id).update(patch).then(function () { showToast("Fiche mise à jour"); });
+  }
+  function deleteStudent(id) {
+    var db = requireDb(); if (!db) return;
+    db.collection("students").doc(id).delete().then(function () { showToast("Élève supprimé"); closeModal(); });
+  }
+
+  function createSession(data) {
+    var db = requireDb(); if (!db) return;
+    data.groupId = state.groupId;
+    data.creeLe = new Date().toISOString();
+    db.collection("sessions").add(data).then(function () { showToast("Séance enregistrée"); closeModal(); });
+  }
+  function updateSession(id, patch) {
+    var db = requireDb(); if (!db) return;
+    db.collection("sessions").doc(id).update(patch).then(function () { showToast("Séance mise à jour"); });
+  }
+  function deleteSession(id) {
+    var db = requireDb(); if (!db) return;
+    db.collection("sessions").doc(id).delete().then(function () { showToast("Séance supprimée"); closeModal(); });
+  }
+
+  // ---------------------------------------------------------------------
+  // Modal helpers
+  // ---------------------------------------------------------------------
+  function openModal(m) { state.modal = m; render(); }
+  function closeModal() { state.modal = null; render(); }
+  function confirmAction(message, onYes) {
+    openModal({ type: "confirm", message: message, onYes: onYes });
+  }
+
+  // ---------------------------------------------------------------------
+  // Render: shell
+  // ---------------------------------------------------------------------
+  var ACCESS_CODE = "THEATRE2026";
+
+  function renderLockScreen() {
+    return (
+      '<div class="lock-screen"><div class="card lock-card">' +
+        '<div class="brand">' + ICONS.mask + '<span class="brand-title">Carnet d\'atelier</span></div>' +
+        '<p class="muted" style="font-size:13px;margin:6px 0 18px;">Accès réservé aux animateurs — entrez le code qui vous a été communiqué.</p>' +
+        (state.lockError ? '<p class="lock-error">' + escapeHtml(state.lockError) + "</p>" : "") +
+        '<div class="field"><input type="password" id="lock-code" placeholder="Code d\'accès" autocomplete="off"></div>' +
+        '<button class="btn btn-accent" style="width:100%;justify-content:center;" data-action="unlock">Entrer</button>' +
+      "</div></div>"
+    );
+  }
+
+  function attemptUnlock() {
+    var input = document.getElementById("lock-code");
+    var value = input ? input.value : "";
+    if (value === ACCESS_CODE) {
+      state.unlocked = true;
+      state.lockError = "";
+      localStorage.setItem("atelier.accessGranted", "yes");
+      render();
+      initDb();
+    } else {
+      state.lockError = "Code incorrect.";
+      render();
+    }
+  }
+
+  function render() {
+    var app = document.getElementById("app");
+    if (!state.unlocked) {
+      app.innerHTML = renderLockScreen();
+      bindEvents();
+      return;
+    }
+    var html = "";
+    html += renderTopbar();
+    if (state.dbState === "unavailable") {
+      html += '<div class="banner"><span>La connexion aux données du carnet est indisponible pour le moment. Vos modifications ne seront pas sauvegardées tant que la connexion n\'est pas rétablie.</span>' +
+        '<button class="btn btn-sm" data-action="retry-db">Réessayer</button></div>';
+    }
+    if (state.dbState === "ready") {
+      html += renderGroupStrip();
+      html += renderMain();
+    } else if (state.dbState === "connecting") {
+      html += '<div class="empty-state"><p>Connexion au carnet…</p></div>';
+    }
+    app.innerHTML = html;
+    // Only touch the modal DOM when the open/closed modal actually changes —
+    // background re-renders (live data updates, tab switches) must never
+    // wipe text the user is mid-typing into an open modal.
+    if (state.modal !== modalRenderedFor) {
+      renderModal();
+      modalRenderedFor = state.modal;
+    }
+    bindEvents();
+  }
+
+  function renderTopbar() {
+    var years = allYears();
+    var opts = years.map(function (y) {
+      return '<option value="' + escapeHtml(y) + '"' + (y === state.year ? " selected" : "") + ">" + escapeHtml(y) + "</option>";
+    }).join("");
+    return (
+      '<div class="topbar"><div class="topbar-inner">' +
+        '<div class="brand">' + ICONS.mask + '<span class="brand-title">Carnet d\'atelier</span></div>' +
+        '<select class="year-select" id="year-select">' + opts + '</select>' +
+        '<button class="btn btn-sm" data-action="new-year">' + ICONS.plus + ' Année</button>' +
+        '<button class="btn btn-sm" data-action="export-data">Exporter toutes les données</button>' +
+      '</div></div>'
+    );
+  }
+
+  function renderGroupStrip() {
+    var groups = groupsForYear(state.year);
+    var chips = groups.map(function (g) {
+      var cls = "group-chip" + (g.id === state.groupId ? " active" : "") + (g.archive ? " archived" : "");
+      return '<button class="' + cls + '" data-action="select-group" data-id="' + g.id + '"><span class="dot"></span>' + escapeHtml(g.nom) + (g.ville ? ' <span style="opacity:.7;">· ' + escapeHtml(g.ville) + "</span>" : "") + "</button>";
+    }).join("");
+    return (
+      '<div class="group-strip">' + chips +
+      '<button class="btn btn-sm" data-action="new-group">' + ICONS.plus + " Groupe</button></div>"
+    );
+  }
+
+  function renderMain() {
+    var group = currentGroup();
+    if (!group) {
+      return (
+        '<div class="empty-state">' + ICONS.mask.replace('width="22" height="22"', 'width="40" height="40"') +
+        "<h2>Aucun groupe pour " + escapeHtml(state.year) + "</h2>" +
+        "<p>Créez un premier groupe d'élèves pour cette année afin de commencer à faire l'appel et suivre vos séances.</p>" +
+        '<button class="btn btn-accent" data-action="new-group">' + ICONS.plus + " Créer un groupe</button>" +
+        "</div>"
+      );
+    }
+    var html = "";
+    html += '<div class="section-head"><h2>' + escapeHtml(group.nom) + (group.ville ? ' <span class="muted" style="font-size:15px;font-family:var(--font-body);font-weight:400;">— ' + escapeHtml(group.ville) + "</span>" : "") + '</h2><div style="display:flex;gap:6px;">' +
+      '<button class="btn btn-sm" data-action="edit-group">Modifier</button>' +
+      '<button class="btn btn-sm" data-action="duplicate-group">Reconduire l\'an prochain</button>' +
+      "</div></div>";
+    html += renderTabs();
+    if (state.tab === "eleves") html += renderElevesTab(group);
+    else if (state.tab === "seances") html += renderSeancesTab(group);
+    else if (state.tab === "bilan") html += renderBilanTab(group);
+    return html;
+  }
+
+  function renderTabs() {
+    function tb(key, label) {
+      return '<button class="tab-btn' + (state.tab === key ? " active" : "") + '" data-action="set-tab" data-tab="' + key + '">' + label + "</button>";
+    }
+    return '<div class="tabs">' + tb("eleves", "Élèves") + tb("seances", "Séances") + tb("bilan", "Bilan") + "</div>";
+  }
+
+  // ---------------------------------------------------------------------
+  // Tab: Élèves
+  // ---------------------------------------------------------------------
+  function renderElevesTab() {
+    var list = state.students.filter(function (s) {
+      if (!state.studentFilter) return true;
+      var q = state.studentFilter.toLowerCase();
+      return (s.nom + " " + s.prenom).toLowerCase().indexOf(q) !== -1;
+    });
+    var html = '<div class="section-head"><span class="count-tag">' + state.students.length + " élève(s)</span>" +
+      '<button class="btn btn-accent btn-sm" data-action="new-student">' + ICONS.plus + " Ajouter un élève</button></div>";
+    if (state.students.length > 6) {
+      html += '<div class="field" style="max-width:280px;margin-bottom:16px;"><input type="text" placeholder="Rechercher un élève…" id="student-filter" value="' + escapeHtml(state.studentFilter) + '"></div>';
+    }
+    if (!list.length) {
+      html += '<div class="empty-state"><p>' + (state.students.length ? "Aucun élève ne correspond à la recherche." : "Aucun élève dans ce groupe pour l'instant.") + "</p></div>";
+    } else {
+      html += '<div class="student-grid">';
+      list.forEach(function (s) {
+        var stats = statsForStudent(s.id);
+        html += '<button class="student-card' + (s.actif === false ? " inactive" : "") + '" data-action="open-student" data-id="' + s.id + '">' +
+          '<div class="student-name">' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + "</div>" +
+          '<div class="student-meta">' +
+            (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
+            '<span class="pill pill-red">' + stats.absent + " abs.</span>" +
+            '<span class="pill pill-gold">' + stats.retard + " retard(s)</span>" +
+            (s.actif === false ? '<span class="pill pill-muted">inactif</span>' : "") +
+          "</div></button>";
+      });
+      html += "</div>";
+    }
+    return html;
+  }
+
+  // ---------------------------------------------------------------------
+  // Tab: Séances
+  // ---------------------------------------------------------------------
+  function renderSeancesTab() {
+    var activeStudents = state.students.filter(function (s) { return s.actif !== false; });
+    var html = '<div class="section-head"><span class="count-tag">' + state.sessions.length + " séance(s)</span>" +
+      '<button class="btn btn-accent btn-sm" data-action="new-session"' + (activeStudents.length ? "" : " disabled") + ">" + ICONS.plus + " Faire l'appel</button></div>";
+    if (!activeStudents.length) html += '<p class="inline-note">Ajoutez au moins un élève actif avant de créer une séance.</p>';
+    if (!state.sessions.length) {
+      html += '<div class="empty-state"><p>Aucune séance enregistrée pour ce groupe.</p></div>';
+    } else {
+      html += '<div class="card">';
+      state.sessions.forEach(function (s) {
+        var counts = { present: 0, retard: 0, absent: 0 };
+        Object.keys(s.presences || {}).forEach(function (k) { counts[s.presences[k].statut] = (counts[s.presences[k].statut] || 0) + 1; });
+        html += '<div class="session-row" data-action="open-session" data-id="' + s.id + '">' +
+          '<div class="session-date">' + dowShortFR(s.date) + " " + formatDateFR(s.date) + "</div>" +
+          '<div class="session-summary"><div class="session-content-preview">' + escapeHtml(s.contenu || "(pas de contenu noté)") + "</div></div>" +
+          '<div class="session-counts">' +
+            '<span class="pill pill-green">' + counts.present + "</span>" +
+            '<span class="pill pill-gold">' + counts.retard + "</span>" +
+            '<span class="pill pill-red">' + counts.absent + "</span>" +
+          "</div></div>";
+      });
+      html += "</div>";
+    }
+    return html;
+  }
+
+  // ---------------------------------------------------------------------
+  // Tab: Bilan
+  // ---------------------------------------------------------------------
+  function renderBilanTab() {
+    if (!state.students.length) return '<div class="empty-state"><p>Ajoutez des élèves pour voir apparaître le bilan d\'assiduité.</p></div>';
+    var rows = state.students.map(function (s) {
+      var stats = statsForStudent(s.id);
+      return { s: s, stats: stats };
+    }).sort(function (a, b) { return (b.stats.absent + b.stats.retard) - (a.stats.absent + a.stats.retard); });
+    var html = '<div class="card bilan-wrap"><table class="bilan"><thead><tr>' +
+      "<th>Élève</th><th class=\"num\">Séances</th><th class=\"num\">Présent</th><th class=\"num\">Retard</th><th class=\"num\">Min. retard</th><th class=\"num\">Absent</th><th>Assiduité</th>" +
+      "</tr></thead><tbody>";
+    rows.forEach(function (r) {
+      var rate = r.stats.rate == null ? "—" : r.stats.rate + "%";
+      html += "<tr>" +
+        "<td>" + escapeHtml(r.s.prenom) + " " + escapeHtml(upperNom(r.s.nom)) + "</td>" +
+        '<td class="num">' + r.stats.total + "</td>" +
+        '<td class="num">' + r.stats.present + "</td>" +
+        '<td class="num">' + r.stats.retard + "</td>" +
+        '<td class="num">' + r.stats.minutes + "</td>" +
+        '<td class="num">' + r.stats.absent + "</td>" +
+        "<td><span class=\"bar-track\"><span class=\"bar-fill\" style=\"width:" + (r.stats.rate || 0) + "%\"></span></span> <span class=\"count-tag\">" + rate + "</span></td>" +
+        "</tr>";
+    });
+    html += "</tbody></table></div>";
+    return html;
+  }
+
+  // ---------------------------------------------------------------------
+  // Modals
+  // ---------------------------------------------------------------------
+  function renderModal() {
+    var host = document.getElementById("modal-host");
+    if (host) host.remove();
+    if (!state.modal) return;
+    var div = document.createElement("div");
+    div.id = "modal-host";
+    div.innerHTML = '<div class="modal-overlay" id="modal-overlay"><div class="modal">' + modalBody() + "</div></div>";
+    document.body.appendChild(div);
+    bindModalEvents();
+  }
+
+  function modalBody() {
+    var m = state.modal;
+    if (m.type === "confirm") {
+      return '<div class="modal-head"><h3>Confirmation</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        "<p>" + escapeHtml(m.message) + "</p>" +
+        '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" style="background:var(--red);border-color:var(--red);" data-action="confirm-yes">Confirmer</button></div>';
+    }
+    if (m.type === "new-year") {
+      return '<div class="modal-head"><h3>Nouvelle année</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<div class="field"><label>Année scolaire</label><input type="text" id="f-year" placeholder="2027-2028" value=""></div>' +
+        '<p class="inline-note">Choisissez ensuite un groupe existant à reconduire, ou créez un nouveau groupe pour cette année.</p>' +
+        '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-year">Passer à cette année</button></div>';
+    }
+    if (m.type === "group") {
+      var g = m.group || {};
+      return '<div class="modal-head"><h3>' + (m.group ? "Modifier le groupe" : "Nouveau groupe") + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<div class="field"><label>Nom du groupe</label><input type="text" id="f-nom" placeholder="Ex. Atelier CM1-CM2, Groupe du mardi…" value="' + escapeHtml(g.nom || "") + '"></div>' +
+        '<div class="field-row"><div class="field"><label>Ville</label><input type="text" id="f-ville" placeholder="Ex. Lyon" value="' + escapeHtml(g.ville || "") + '"></div>' +
+        '<div class="field"><label>Année scolaire</label><input type="text" id="f-annee" value="' + escapeHtml(g.annee || state.year) + '"></div></div>' +
+        (m.group ? '<div class="field"><label>Statut</label><select id="f-archive"><option value="false"' + (!g.archive ? " selected" : "") + '>Actif</option><option value="true"' + (g.archive ? " selected" : "") + ">Archivé</option></select></div>" : "") +
+        '<div class="form-actions">' +
+          (m.group ? '<button class="btn btn-danger" data-action="delete-group">Supprimer le groupe</button>' : "") +
+          '<button class="btn" data-action="close-modal">Annuler</button>' +
+          '<button class="btn btn-accent" data-action="save-group">Enregistrer</button>' +
+        "</div>";
+    }
+    if (m.type === "duplicate-group") {
+      return '<div class="modal-head"><h3>Reconduire ce groupe</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<p class="inline-note">Crée un nouveau groupe pour l\'année suivante, en reprenant si besoin la liste des élèves actifs (nom, prénom, coordonnées des parents).</p>' +
+        '<div class="field"><label>Nouvelle année</label><input type="text" id="f-newyear" value="' + escapeHtml(m.suggestedYear) + '"></div>' +
+        '<div class="field"><label>Nom du nouveau groupe</label><input type="text" id="f-newname" value="' + escapeHtml(m.group.nom) + '"></div>' +
+        '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-carry" checked style="width:auto;"><label style="text-transform:none;font-weight:400;">Copier les élèves actifs dans le nouveau groupe</label></div>' +
+        '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-duplicate">Créer</button></div>';
+    }
+    if (m.type === "student") {
+      var s = m.student || {};
+      return '<div class="modal-head"><h3>' + (m.student ? escapeHtml(s.prenom + " " + upperNom(s.nom)) : "Nouvel élève") + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<div class="field-row"><div class="field"><label>Prénom</label><input type="text" id="f-prenom" value="' + escapeHtml(s.prenom || "") + '"></div>' +
+        '<div class="field"><label>Nom</label><input type="text" id="f-nom" style="text-transform:uppercase;" value="' + escapeHtml(s.nom || "") + '"></div></div>' +
+        '<div class="field" style="max-width:120px;"><label>Âge</label><input type="number" min="0" max="99" id="f-age" value="' + escapeHtml(s.age != null ? s.age : "") + '"></div>' +
+        '<fieldset><legend>Parent / responsable 1</legend>' +
+          '<div class="field"><label>Nom</label><input type="text" id="f-p1nom" value="' + escapeHtml(s.parent1Nom || "") + '"></div>' +
+          '<div class="field-row"><div class="field"><label>Téléphone</label><input type="tel" id="f-p1tel" value="' + escapeHtml(s.parent1Tel || "") + '"></div>' +
+          '<div class="field"><label>Email</label><input type="email" id="f-p1email" value="' + escapeHtml(s.parent1Email || "") + '"></div></div>' +
+        "</fieldset>" +
+        '<fieldset><legend>Parent / responsable 2 (optionnel)</legend>' +
+          '<div class="field"><label>Nom</label><input type="text" id="f-p2nom" value="' + escapeHtml(s.parent2Nom || "") + '"></div>' +
+          '<div class="field-row"><div class="field"><label>Téléphone</label><input type="tel" id="f-p2tel" value="' + escapeHtml(s.parent2Tel || "") + '"></div>' +
+          '<div class="field"><label>Email</label><input type="email" id="f-p2email" value="' + escapeHtml(s.parent2Email || "") + '"></div></div>' +
+        "</fieldset>" +
+        '<div class="field"><label>Infos complémentaires</label><textarea id="f-infos" placeholder="Allergies, transport, comportement, à surveiller…">' + escapeHtml(s.infos || "") + "</textarea></div>" +
+        (m.student ? '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-actif" ' + (s.actif === false ? "" : "checked") + ' style="width:auto;"><label style="text-transform:none;font-weight:400;">Élève actif dans le groupe</label></div>' : "") +
+        (m.student ? renderStudentHistory(s.id) : "") +
+        '<div class="form-actions">' +
+          (m.student ? '<button class="btn btn-danger" data-action="delete-student" data-id="' + s.id + '">Supprimer</button>' : "") +
+          '<button class="btn" data-action="close-modal">Annuler</button>' +
+          '<button class="btn btn-accent" data-action="save-student"' + (m.student ? ' data-id="' + s.id + '"' : "") + ">Enregistrer</button>" +
+        "</div>";
+    }
+    if (m.type === "session") {
+      return sessionModalBody(m);
+    }
+    return "";
+  }
+
+  function renderStudentHistory(studentId) {
+    var relevant = state.sessions.filter(function (s) { return s.presences && s.presences[studentId]; });
+    if (!relevant.length) return "";
+    var html = '<div class="divider"></div><div class="field"><label>Historique des présences</label></div>';
+    relevant.slice(0, 12).forEach(function (s) {
+      var p = s.presences[studentId];
+      var pillClass = p.statut === "present" ? "pill-green" : (p.statut === "retard" ? "pill-gold" : "pill-red");
+      var label = p.statut === "present" ? "Présent" : (p.statut === "retard" ? ("Retard" + (p.minutesRetard ? " (" + p.minutesRetard + " min)" : "")) : "Absent");
+      html += '<div class="history-item"><span>' + formatDateFR(s.date) + '</span><span class="pill ' + pillClass + '">' + label + "</span></div>";
+    });
+    html += "</div>";
+    return html;
+  }
+
+  function sessionModalBody(m) {
+    var session = m.session;
+    var isNew = !session;
+    var date = session ? session.date : todayISO();
+    var contenu = session ? session.contenu : "";
+    var notes = session ? session.notes : "";
+    // The working copy of presences lives on the modal object (m._presences)
+    // so that explicit re-renders (status toggles, add/remove student) reuse
+    // the same in-progress object instead of recomputing it from the
+    // original session and discarding unsaved changes.
+    var presences;
+    if (m._presences) {
+      presences = m._presences;
+    } else {
+      presences = session ? Object.assign({}, session.presences) : {};
+      if (isNew) {
+        state.students.filter(function (s) { return s.actif !== false; }).forEach(function (s) {
+          presences[s.id] = { statut: "present", minutesRetard: null, commentaire: "" };
+        });
+      }
+      m._presences = presences;
+    }
+
+    var rows = Object.keys(presences).map(function (studentId) {
+      var st = studentById(studentId) || { prenom: "(élève supprimé)", nom: "" };
+      var p = presences[studentId];
+      function sb(key, label) {
+        return '<button type="button" class="status-btn' + (p.statut === key ? " active" : "") + '" data-action="set-status" data-student="' + studentId + '" data-status="' + key + '">' + label + "</button>";
+      }
+      return '<div class="attend-row" data-student-row="' + studentId + '">' +
+        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) + "</span>" +
+        '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + "</div>" +
+        (p.statut === "retard" ? '<input type="number" min="0" class="retard-min" placeholder="min" data-action="set-retard-min" data-student="' + studentId + '" value="' + (p.minutesRetard || "") + '">' : "") +
+        '<button type="button" class="btn btn-ghost btn-sm" data-action="remove-from-session" data-student="' + studentId + '" title="Retirer de cette séance">&times;</button>' +
+        "</div>";
+    }).join("");
+
+    var notInSession = state.students.filter(function (s) { return !presences[s.id]; });
+    var addOptions = notInSession.map(function (s) { return '<option value="' + s.id + '">' + escapeHtml(s.prenom + " " + upperNom(s.nom)) + "</option>"; }).join("");
+
+    return '<div class="modal-head"><h3>' + (isNew ? "Faire l'appel" : "Séance du " + formatDateFR(date)) + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+      '<div class="field-row"><div class="field"><label>Date</label><input type="date" id="f-sdate" value="' + escapeHtml(date) + '"></div></div>' +
+      '<div class="field"><label>Présences</label><div id="attend-list">' + (rows || '<p class="inline-note">Aucun élève dans cette séance.</p>') + "</div></div>" +
+      (notInSession.length ? '<div class="field-row" style="align-items:end;"><div class="field"><label>Ajouter un élève</label><select id="f-add-student"><option value="">Choisir…</option>' + addOptions + "</select></div>" +
+        '<div class="field"><button type="button" class="btn btn-sm" data-action="add-to-session">' + ICONS.plus + " Ajouter</button></div></div>" : "") +
+      '<div class="field"><label>Contenu de la séance</label><textarea id="f-contenu" placeholder="Exercices, échauffement, scènes travaillées, avancement du projet…">' + escapeHtml(contenu) + "</textarea></div>" +
+      '<div class="field"><label>Notes / observations</label><textarea id="f-notes" placeholder="Observations générales, points à retravailler…">' + escapeHtml(notes) + "</textarea></div>" +
+      '<div class="form-actions">' +
+        (isNew ? "" : '<button class="btn btn-danger" data-action="delete-session" data-id="' + session.id + '">Supprimer la séance</button>') +
+        '<button class="btn" data-action="close-modal">Annuler</button>' +
+        '<button class="btn btn-accent" data-action="save-session"' + (isNew ? "" : ' data-id="' + session.id + '"') + ">Enregistrer</button>" +
+      "</div>";
+  }
+
+  // ---------------------------------------------------------------------
+  // Events
+  // ---------------------------------------------------------------------
+  function bindEvents() {
+    var app = document.getElementById("app");
+    var lockInput = document.getElementById("lock-code");
+    if (lockInput) {
+      lockInput.focus();
+      lockInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") attemptUnlock();
+      });
+    }
+    var yearSelect = document.getElementById("year-select");
+    if (yearSelect) {
+      yearSelect.addEventListener("change", function () {
+        state.year = yearSelect.value;
+        var groups = groupsForYear(state.year);
+        state.groupId = groups.length ? groups[0].id : null;
+        saveNav();
+        subscribeGroup(state.groupId);
+        render();
+      });
+    }
+    var filter = document.getElementById("student-filter");
+    if (filter) {
+      filter.addEventListener("input", function () { state.studentFilter = filter.value; render(); focusFilter(); });
+    }
+    if (!appClickBound) {
+      // #app's own node is never replaced (only its innerHTML), so this
+      // delegated listener must be attached exactly once — attaching it
+      // again on every render would stack duplicate handlers and fire
+      // every action multiple times.
+      app.addEventListener("click", handleClick);
+      appClickBound = true;
+    }
+  }
+
+  function focusFilter() {
+    var f = document.getElementById("student-filter");
+    if (f) { f.focus(); var v = f.value; f.value = ""; f.value = v; }
+  }
+
+  function handleClick(e) {
+    var btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    var action = btn.dataset.action;
+    switch (action) {
+      case "unlock": attemptUnlock(); break;
+      case "retry-db": state.dbState = "connecting"; render(); initDb(); break;
+      case "select-group": selectGroup(btn.dataset.id); break;
+      case "set-tab": state.tab = btn.dataset.tab; render(); break;
+      case "new-group": openModal({ type: "group", group: null }); break;
+      case "edit-group": openModal({ type: "group", group: currentGroup() }); break;
+      case "duplicate-group": {
+        var g = currentGroup();
+        var years = allYears();
+        var idx = years.indexOf(g.annee);
+        var suggested = nextSchoolYear(g.annee);
+        openModal({ type: "duplicate-group", group: g, suggestedYear: suggested });
+        break;
+      }
+      case "new-student": openModal({ type: "student", student: null }); break;
+      case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id) }); break;
+      case "new-session": openModal({ type: "session", session: null }); break;
+      case "open-session": {
+        var s = state.sessions.find(function (x) { return x.id === btn.dataset.id; });
+        openModal({ type: "session", session: s });
+        break;
+      }
+      case "new-year": openModal({ type: "new-year" }); break;
+      case "export-data": exportAllData(); break;
+      case "close-modal": closeModal(); break;
+      default: break;
+    }
+  }
+
+  function nextSchoolYear(y) {
+    var m = /^(\d{4})-(\d{4})$/.exec(y || "");
+    if (!m) return currentSchoolYear();
+    var a = parseInt(m[1], 10) + 1, b = parseInt(m[2], 10) + 1;
+    return a + "-" + b;
+  }
+
+  function bindModalEvents() {
+    var overlay = document.getElementById("modal-overlay");
+    if (!overlay) return;
+    overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) closeModal(); });
+    overlay.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      var action = btn.dataset.action;
+      var m = state.modal;
+      if (action === "close-modal") { closeModal(); return; }
+      if (action === "confirm-yes") { var fn = m.onYes; closeModal(); if (fn) fn(); return; }
+
+      if (action === "save-year") {
+        var y = document.getElementById("f-year").value.trim();
+        if (!y) return;
+        state.year = y; state.groupId = null; saveNav(); subscribeGroup(null); closeModal();
+        return;
+      }
+      if (action === "save-group") {
+        var nom = document.getElementById("f-nom").value.trim();
+        var ville = document.getElementById("f-ville").value.trim();
+        var annee = document.getElementById("f-annee").value.trim();
+        if (!nom || !annee) { showToast("Nom et année requis"); return; }
+        if (m.group) {
+          var patch = { nom: nom, ville: ville, annee: annee };
+          var archEl = document.getElementById("f-archive");
+          if (archEl) patch.archive = archEl.value === "true";
+          updateGroup(m.group.id, patch);
+        } else {
+          createGroup({ nom: nom, ville: ville, annee: annee });
+        }
+        closeModal();
+        return;
+      }
+      if (action === "delete-group") {
+        confirmAction("Supprimer définitivement ce groupe, ses élèves et toutes ses séances ?", function () { deleteGroupCascade(m.group.id); });
+        return;
+      }
+      if (action === "save-duplicate") {
+        var ny = document.getElementById("f-newyear").value.trim();
+        var nn = document.getElementById("f-newname").value.trim();
+        var carry = document.getElementById("f-carry").checked;
+        if (!ny || !nn) return;
+        duplicateGroupToYear(m.group, ny, nn, carry);
+        closeModal();
+        return;
+      }
+      if (action === "save-student") {
+        var data = {
+          prenom: document.getElementById("f-prenom").value.trim(),
+          nom: document.getElementById("f-nom").value.trim(),
+          age: document.getElementById("f-age").value ? parseInt(document.getElementById("f-age").value, 10) : null,
+          parent1Nom: document.getElementById("f-p1nom").value.trim(),
+          parent1Tel: document.getElementById("f-p1tel").value.trim(),
+          parent1Email: document.getElementById("f-p1email").value.trim(),
+          parent2Nom: document.getElementById("f-p2nom").value.trim(),
+          parent2Tel: document.getElementById("f-p2tel").value.trim(),
+          parent2Email: document.getElementById("f-p2email").value.trim(),
+          infos: document.getElementById("f-infos").value.trim()
+        };
+        if (!data.prenom || !data.nom) { showToast("Prénom et nom requis"); return; }
+        var actifEl = document.getElementById("f-actif");
+        if (actifEl) data.actif = actifEl.checked;
+        if (m.student) updateStudent(m.student.id, data); else createStudent(data);
+        closeModal();
+        return;
+      }
+      if (action === "delete-student") {
+        confirmAction("Supprimer définitivement cette fiche élève ? L'historique des séances passées conservera son nom mais plus ses coordonnées.", function () { deleteStudent(btn.dataset.id); });
+        return;
+      }
+      if (action === "set-status") {
+        m._presences[btn.dataset.student].statut = btn.dataset.status;
+        if (btn.dataset.status !== "retard") m._presences[btn.dataset.student].minutesRetard = null;
+        rerenderModalKeepScroll();
+        return;
+      }
+      if (action === "remove-from-session") {
+        delete m._presences[btn.dataset.student];
+        rerenderModalKeepScroll();
+        return;
+      }
+      if (action === "add-to-session") {
+        var sel = document.getElementById("f-add-student");
+        if (sel.value) { m._presences[sel.value] = { statut: "present", minutesRetard: null, commentaire: "" }; rerenderModalKeepScroll(); }
+        return;
+      }
+      if (action === "save-session") {
+        var sdate = document.getElementById("f-sdate").value || todayISO();
+        var payload = {
+          date: sdate,
+          contenu: document.getElementById("f-contenu").value.trim(),
+          notes: document.getElementById("f-notes").value.trim(),
+          presences: m._presences
+        };
+        if (m.session) updateSession(m.session.id, payload); else createSession(payload);
+        closeModal();
+        return;
+      }
+      if (action === "delete-session") {
+        confirmAction("Supprimer définitivement cette séance et son appel ?", function () { deleteSession(btn.dataset.id); });
+        return;
+      }
+    });
+    overlay.addEventListener("input", function (e) {
+      if (e.target.dataset.action === "set-retard-min") {
+        state.modal._presences[e.target.dataset.student].minutesRetard = e.target.value ? parseInt(e.target.value, 10) : null;
+      }
+    });
+  }
+
+  function rerenderModalKeepScroll() {
+    var overlay = document.getElementById("modal-overlay");
+    var scroll = overlay ? overlay.scrollTop : 0;
+    // preserve text fields not tracked in state before re-render
+    var m = state.modal;
+    var dateEl = document.getElementById("f-sdate");
+    var contenuEl = document.getElementById("f-contenu");
+    var notesEl = document.getElementById("f-notes");
+    if (dateEl) m._date = dateEl.value;
+    if (contenuEl) m._contenu = contenuEl.value;
+    if (notesEl) m._notes = notesEl.value;
+    renderModal();
+    var newOverlay = document.getElementById("modal-overlay");
+    if (newOverlay) newOverlay.scrollTop = scroll;
+    if (m._date) document.getElementById("f-sdate").value = m._date;
+    if (m._contenu != null) document.getElementById("f-contenu").value = m._contenu;
+    if (m._notes != null) document.getElementById("f-notes").value = m._notes;
+  }
+
+  // ---------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------
+  render();
+  if (state.unlocked) initDb();
+})();
+</script>
+</body>
+</html>
