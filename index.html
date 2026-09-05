@@ -517,6 +517,14 @@
     return { present: present, retard: retard, absent: absent, minutes: minutes, total: total, rate: rate };
   }
 
+  // A free trial class is offered before payment is due: unpaid students who
+  // haven't yet attended (present or retard counts as attended) show as
+  // "trial pending" rather than "unpaid" until they've actually shown up once.
+  function paymentStatus(s, stats) {
+    if (s.paye) return "paye";
+    return (stats.present > 0 || stats.retard > 0) ? "du" : "essai";
+  }
+
   // ---------------------------------------------------------------------
   // Mutations
   // ---------------------------------------------------------------------
@@ -829,10 +837,13 @@
       html += '<div class="student-grid">';
       list.forEach(function (s) {
         var stats = statsForStudent(s.id);
+        var pstatus = paymentStatus(s, stats);
+        var pcls = pstatus === "paye" ? "pill-green" : (pstatus === "essai" ? "pill-gold" : "pill-red");
+        var ptitle = pstatus === "paye" ? "A réglé l'année" : (pstatus === "essai" ? "Cours d'essai gratuit pas encore effectué" : "Cours d'essai effectué — n'a pas réglé l'année");
         html += '<button class="student-card' + (s.actif === false ? " inactive" : "") + '" data-action="open-student" data-id="' + s.id + '">' +
           '<div class="student-name">' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + "</div>" +
           '<div class="student-meta">' +
-            '<span class="pill ' + (s.paye ? "pill-green" : "pill-red") + '" title="' + (s.paye ? "A réglé l'année" : "N'a pas réglé l'année") + '">€</span>' +
+            '<span class="pill ' + pcls + '" title="' + ptitle + '">€</span>' +
             (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
             '<span class="pill pill-red">' + stats.absent + " abs.</span>" +
             '<span class="pill pill-gold">' + stats.retard + " retard(s)</span>" +
@@ -1025,8 +1036,11 @@
   }
 
   function renderStudentView(s) {
+    var pstatus = paymentStatus(s, statsForStudent(s.id));
+    var pcls = pstatus === "paye" ? "pill-green" : (pstatus === "essai" ? "pill-gold" : "pill-red");
+    var plabel = pstatus === "paye" ? "€ Année réglée" : (pstatus === "essai" ? "€ Essai gratuit non effectué" : "€ Non réglée");
     var badges = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
-        '<span class="pill ' + (s.paye ? "pill-green" : "pill-red") + '">' + (s.paye ? "€ Année réglée" : "€ Non réglée") + "</span>" +
+        '<span class="pill ' + pcls + '">' + plabel + "</span>" +
         (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
         (s.actif === false ? '<span class="pill pill-muted">Inactif</span>' : "") +
       "</div>";
