@@ -841,10 +841,14 @@
         var pcls = pstatus === "paye" ? "pill-green" : (pstatus === "essai" ? "pill-gold" : "pill-red");
         var ptitle = pstatus === "paye" ? "A réglé l'année" : (pstatus === "essai" ? "Cours d'essai gratuit pas encore effectué" : "Cours d'essai effectué — n'a pas réglé l'année");
         html += '<button class="student-card' + (s.actif === false ? " inactive" : "") + '" data-action="open-student" data-id="' + s.id + '">' +
-          '<div class="student-name">' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + "</div>" +
+          '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;">' +
+            '<div class="student-name">' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + "</div>" +
+            '<div style="display:flex;gap:6px;flex:none;">' +
+              '<span class="pill ' + pcls + '" title="' + ptitle + '">€</span>' +
+              (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
+            "</div>" +
+          "</div>" +
           '<div class="student-meta">' +
-            '<span class="pill ' + pcls + '" title="' + ptitle + '">€</span>' +
-            (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
             '<span class="pill pill-red">' + stats.absent + " abs.</span>" +
             '<span class="pill pill-gold">' + stats.retard + " retard(s)</span>" +
             (s.actif === false ? '<span class="pill pill-muted">inactif</span>' : "") +
