@@ -1078,7 +1078,6 @@
       var label = p.statut === "present" ? "Présent" : (p.statut === "retard" ? ("Retard" + (p.minutesRetard ? " (" + p.minutesRetard + " min)" : "")) : "Absent");
       html += '<div class="history-item"><span>' + formatDateFR(s.date) + '</span><span class="pill ' + pillClass + '">' + label + "</span></div>";
     });
-    html += "</div>";
     return html;
   }
 
