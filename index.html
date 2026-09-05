@@ -992,10 +992,10 @@
         return '<div class="history-item"><span>' + escapeHtml(x.prenom || "") + " " + escapeHtml(upperNom(x.nom || "")) + '</span><button type="button" class="btn btn-sm" data-action="add-existing-student" data-id="' + x.id + '">Ajouter</button></div>';
       }).join("");
       return '<div class="modal-head"><h3>Ajouter un élève</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<button type="button" class="btn btn-accent" style="width:100%;justify-content:center;" data-action="new-student-fiche">' + ICONS.plus + " Créer une nouvelle fiche</button>" +
+        '<div class="divider"></div>' +
         (candidates.length ? '<div class="field"><label>Élève déjà connu</label><input type="text" id="f-student-search" placeholder="Rechercher parmi les fiches existantes…" value="' + escapeHtml(m.query || "") + '"></div>' : "") +
         (candidates.length ? (rows || '<p class="inline-note">Aucun résultat.</p>') : '<p class="inline-note">Aucune autre fiche élève n\'est encore enregistrée.</p>') +
-        '<div class="divider"></div>' +
-        '<button type="button" class="btn btn-accent" style="width:100%;justify-content:center;" data-action="new-student-fiche">' + ICONS.plus + " Créer une nouvelle fiche</button>" +
         '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button></div>';
     }
     if (m.type === "student") {
