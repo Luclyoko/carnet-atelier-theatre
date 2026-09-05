@@ -332,6 +332,7 @@
     students: [],
     sessions: [],
     year: localStorage.getItem("atelier.year") || currentSchoolYear(),
+    villeFilter: localStorage.getItem("atelier.ville") || "",
     groupId: localStorage.getItem("atelier.groupId") || null,
     tab: "eleves", // eleves | seances | bilan
     studentFilter: "",
@@ -343,6 +344,7 @@
 
   function saveNav() {
     localStorage.setItem("atelier.year", state.year);
+    localStorage.setItem("atelier.ville", state.villeFilter);
     if (state.groupId) localStorage.setItem("atelier.groupId", state.groupId);
   }
 
@@ -447,7 +449,11 @@
   // Derived data helpers
   // ---------------------------------------------------------------------
   function groupsForYear(year) {
-    return state.groups.filter(function (g) { return g.annee === year; });
+    return state.groups.filter(function (g) {
+      if (g.annee !== year) return false;
+      if (state.villeFilter && (g.ville || "") !== state.villeFilter) return false;
+      return true;
+    });
   }
   function allYears() {
     var set = {};
@@ -455,6 +461,11 @@
     set[currentSchoolYear()] = true;
     set[state.year] = true;
     return Object.keys(set).sort().reverse();
+  }
+  function allVilles() {
+    var set = {};
+    state.groups.forEach(function (g) { if (g.ville) set[g.ville] = true; });
+    return Object.keys(set).sort(function (a, b) { return a.localeCompare(b, "fr"); });
   }
   function currentGroup() {
     return state.groups.find(function (g) { return g.id === state.groupId; }) || null;
@@ -659,10 +670,19 @@
     var opts = years.map(function (y) {
       return '<option value="' + escapeHtml(y) + '"' + (y === state.year ? " selected" : "") + ">" + escapeHtml(y) + "</option>";
     }).join("");
+    var villes = allVilles();
+    var villeSelect = "";
+    if (villes.length) {
+      var villeOpts = '<option value="">Toutes les villes</option>' + villes.map(function (v) {
+        return '<option value="' + escapeHtml(v) + '"' + (v === state.villeFilter ? " selected" : "") + ">" + escapeHtml(v) + "</option>";
+      }).join("");
+      villeSelect = '<select class="year-select" id="ville-select">' + villeOpts + "</select>";
+    }
     return (
       '<div class="topbar"><div class="topbar-inner">' +
         '<div class="brand">' + ICONS.mask + '<span class="brand-title">Carnet d\'atelier</span></div>' +
         '<select class="year-select" id="year-select">' + opts + '</select>' +
+        villeSelect +
         '<button class="btn btn-sm" data-action="new-year">' + ICONS.plus + ' Année</button>' +
         '<button class="btn btn-sm" data-action="export-data">Exporter toutes les données</button>' +
       '</div></div>'
@@ -686,7 +706,7 @@
     if (!group) {
       return (
         '<div class="empty-state">' + ICONS.mask.replace('width="22" height="22"', 'width="40" height="40"') +
-        "<h2>Aucun groupe pour " + escapeHtml(state.year) + "</h2>" +
+        "<h2>Aucun groupe pour " + escapeHtml(state.year) + (state.villeFilter ? " à " + escapeHtml(state.villeFilter) : "") + "</h2>" +
         "<p>Créez un premier groupe d'élèves pour cette année afin de commencer à faire l'appel et suivre vos séances.</p>" +
         '<button class="btn btn-accent" data-action="new-group">' + ICONS.plus + " Créer un groupe</button>" +
         "</div>"
@@ -831,9 +851,21 @@
     }
     if (m.type === "group") {
       var g = m.group || {};
+      var villeOptions = allVilles().map(function (v) {
+        return '<option value="' + escapeHtml(v) + '"' + (v === (g.ville || "") ? " selected" : "") + ">" + escapeHtml(v) + "</option>";
+      }).join("");
+      var villeField =
+        '<div class="field"><label>Ville</label>' +
+          '<select id="f-ville-select">' +
+            '<option value=""' + (!g.ville ? " selected" : "") + ">— Aucune ville —</option>" +
+            villeOptions +
+            '<option value="__new__">+ Ajouter une nouvelle ville…</option>' +
+          "</select>" +
+          '<input type="text" id="f-ville-new" placeholder="Nom de la nouvelle ville" style="display:none;margin-top:8px;">' +
+        "</div>";
       return '<div class="modal-head"><h3>' + (m.group ? "Modifier le groupe" : "Nouveau groupe") + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
         '<div class="field"><label>Nom du groupe</label><input type="text" id="f-nom" placeholder="Ex. Atelier CM1-CM2, Groupe du mardi…" value="' + escapeHtml(g.nom || "") + '"></div>' +
-        '<div class="field-row"><div class="field"><label>Ville</label><input type="text" id="f-ville" placeholder="Ex. Lyon" value="' + escapeHtml(g.ville || "") + '"></div>' +
+        '<div class="field-row">' + villeField +
         '<div class="field"><label>Année scolaire</label><input type="text" id="f-annee" value="' + escapeHtml(g.annee || state.year) + '"></div></div>' +
         (m.group ? '<div class="field"><label>Statut</label><select id="f-archive"><option value="false"' + (!g.archive ? " selected" : "") + '>Actif</option><option value="true"' + (g.archive ? " selected" : "") + ">Archivé</option></select></div>" : "") +
         '<div class="form-actions">' +
@@ -972,6 +1004,17 @@
         render();
       });
     }
+    var villeSelect = document.getElementById("ville-select");
+    if (villeSelect) {
+      villeSelect.addEventListener("change", function () {
+        state.villeFilter = villeSelect.value;
+        var groups = groupsForYear(state.year);
+        state.groupId = groups.length ? groups[0].id : null;
+        saveNav();
+        subscribeGroup(state.groupId);
+        render();
+      });
+    }
     var filter = document.getElementById("student-filter");
     if (filter) {
       filter.addEventListener("input", function () { state.studentFilter = filter.value; render(); focusFilter(); });
@@ -1052,8 +1095,12 @@
       }
       if (action === "save-group") {
         var nom = document.getElementById("f-nom").value.trim();
-        var ville = document.getElementById("f-ville").value.trim();
+        var villeSelectEl = document.getElementById("f-ville-select");
+        var ville = villeSelectEl.value === "__new__"
+          ? document.getElementById("f-ville-new").value.trim()
+          : villeSelectEl.value;
         var annee = document.getElementById("f-annee").value.trim();
+        if (villeSelectEl.value === "__new__" && !ville) { showToast("Entrez le nom de la nouvelle ville"); return; }
         if (!nom || !annee) { showToast("Nom et année requis"); return; }
         if (m.group) {
           var patch = { nom: nom, ville: ville, annee: annee };
@@ -1139,6 +1186,18 @@
     overlay.addEventListener("input", function (e) {
       if (e.target.dataset.action === "set-retard-min") {
         state.modal._presences[e.target.dataset.student].minutesRetard = e.target.value ? parseInt(e.target.value, 10) : null;
+      }
+    });
+    overlay.addEventListener("change", function (e) {
+      if (e.target.id === "f-ville-select") {
+        var newField = document.getElementById("f-ville-new");
+        if (e.target.value === "__new__") {
+          newField.style.display = "";
+          newField.focus();
+        } else {
+          newField.style.display = "none";
+          newField.value = "";
+        }
       }
     });
   }
