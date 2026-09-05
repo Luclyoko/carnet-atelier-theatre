@@ -199,6 +199,9 @@
   .contact-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
   .contact-line svg { flex: none; opacity: 0.6; }
 
+  .info-row { margin-bottom: 12px; }
+  .info-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+
   .session-row {
     display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--border);
     cursor: pointer;
@@ -900,6 +903,9 @@
         '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-duplicate">Créer</button></div>';
     }
     if (m.type === "student") {
+      if (m.student && m.mode !== "edit") {
+        return renderStudentView(m.student);
+      }
       var s = m.student || {};
       return '<div class="modal-head"><h3>' + (m.student ? escapeHtml(s.prenom + " " + upperNom(s.nom)) : "Nouvel élève") + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
         '<div class="field-row"><div class="field"><label>Prénom</label><input type="text" id="f-prenom" value="' + escapeHtml(s.prenom || "") + '"></div>' +
@@ -934,6 +940,40 @@
       return sessionModalBody(m);
     }
     return "";
+  }
+
+  function infoRow(label, value, href) {
+    if (!value) return "";
+    var content = href ? '<a href="' + escapeHtml(href) + '">' + escapeHtml(value) + "</a>" : escapeHtml(value);
+    return '<div class="info-row"><div class="info-label">' + label + "</div><div>" + content + "</div></div>";
+  }
+
+  function renderStudentView(s) {
+    var badges = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
+        '<span class="pill ' + (s.paye ? "pill-green" : "pill-red") + '">' + (s.paye ? "€ Année réglée" : "€ Non réglée") + "</span>" +
+        (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
+        (s.actif === false ? '<span class="pill pill-muted">Inactif</span>' : "") +
+      "</div>";
+    var own = infoRow("Téléphone élève", s.tel, s.tel ? "tel:" + s.tel : null) +
+      infoRow("Email élève", s.email, s.email ? "mailto:" + s.email : null) +
+      infoRow("Adresse", s.adresse);
+    var parent1 = (s.parent1Nom || s.parent1Tel || s.parent1Email) ?
+      '<div class="divider"></div><fieldset><legend>Parent / responsable 1</legend>' +
+        infoRow("Nom", s.parent1Nom) +
+        infoRow("Téléphone", s.parent1Tel, s.parent1Tel ? "tel:" + s.parent1Tel : null) +
+        infoRow("Email", s.parent1Email, s.parent1Email ? "mailto:" + s.parent1Email : null) +
+      "</fieldset>" : "";
+    var parent2 = (s.parent2Nom || s.parent2Tel || s.parent2Email) ?
+      '<fieldset><legend>Parent / responsable 2</legend>' +
+        infoRow("Nom", s.parent2Nom) +
+        infoRow("Téléphone", s.parent2Tel, s.parent2Tel ? "tel:" + s.parent2Tel : null) +
+        infoRow("Email", s.parent2Email, s.parent2Email ? "mailto:" + s.parent2Email : null) +
+      "</fieldset>" : "";
+    var infos = s.infos ? '<div class="divider"></div>' + infoRow("Infos complémentaires", s.infos) : "";
+    return '<div class="modal-head"><h3>' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+      badges + own + parent1 + parent2 + infos +
+      renderStudentHistory(s.id) +
+      '<div class="form-actions"><button class="btn" data-action="close-modal">Fermer</button><button class="btn btn-accent" data-action="edit-student">Modifier</button></div>';
   }
 
   function renderStudentHistory(studentId) {
@@ -1076,8 +1116,8 @@
         openModal({ type: "duplicate-group", group: g, suggestedYear: suggested });
         break;
       }
-      case "new-student": openModal({ type: "student", student: null }); break;
-      case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id) }); break;
+      case "new-student": openModal({ type: "student", student: null, mode: "edit" }); break;
+      case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id), mode: "view" }); break;
       case "new-session": openModal({ type: "session", session: null }); break;
       case "open-session": {
         var s = state.sessions.find(function (x) { return x.id === btn.dataset.id; });
@@ -1109,6 +1149,7 @@
       var m = state.modal;
       if (action === "close-modal") { closeModal(); return; }
       if (action === "confirm-yes") { var fn = m.onYes; closeModal(); if (fn) fn(); return; }
+      if (action === "edit-student") { m.mode = "edit"; renderModal(); return; }
 
       if (action === "save-year") {
         var y = document.getElementById("f-year").value.trim();
