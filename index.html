@@ -391,11 +391,20 @@
       var db = firebase.firestore();
       state.db = db;
       state.dbState = "ready";
+      var bootSubscribed = false;
       db.collection("groups").orderBy("nom", "asc").onSnapshot(function (snap) {
         state.groups = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
         if (!state.groupId) {
           var firstInYear = state.groups.find(function (g) { return g.annee === state.year; });
           if (firstInYear) state.groupId = firstInYear.id;
+        }
+        // On the very first snapshot after boot, a groupId may already be set
+        // from localStorage (a group remembered from a previous visit) — its
+        // students/sessions listeners were never attached, so start them here
+        // exactly once. Later group switches go through selectGroup() instead.
+        if (!bootSubscribed && state.groupId) {
+          bootSubscribed = true;
+          subscribeGroup(state.groupId);
         }
         render();
       }, function () { state.dbState = "unavailable"; render(); });
