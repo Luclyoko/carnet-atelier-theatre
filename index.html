@@ -904,7 +904,11 @@
       return '<div class="modal-head"><h3>' + (m.student ? escapeHtml(s.prenom + " " + upperNom(s.nom)) : "Nouvel élève") + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
         '<div class="field-row"><div class="field"><label>Prénom</label><input type="text" id="f-prenom" value="' + escapeHtml(s.prenom || "") + '"></div>' +
         '<div class="field"><label>Nom</label><input type="text" id="f-nom" style="text-transform:uppercase;" value="' + escapeHtml(s.nom || "") + '"></div></div>' +
-        '<div class="field" style="max-width:120px;"><label>Âge</label><input type="number" min="0" max="99" id="f-age" value="' + escapeHtml(s.age != null ? s.age : "") + '"></div>' +
+        '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+          '<div class="field" style="width:90px;"><label>Âge</label><input type="number" min="0" max="99" id="f-age" value="' + escapeHtml(s.age != null ? s.age : "") + '"></div>' +
+          '<div class="field" style="flex:1;min-width:140px;"><label>Téléphone élève</label><input type="tel" id="f-tel" value="' + escapeHtml(s.tel || "") + '"></div>' +
+          '<div class="field" style="flex:1;min-width:180px;"><label>Email élève</label><input type="email" id="f-email" value="' + escapeHtml(s.email || "") + '"></div>' +
+        "</div>" +
         '<fieldset><legend>Parent / responsable 1</legend>' +
           '<div class="field"><label>Nom</label><input type="text" id="f-p1nom" value="' + escapeHtml(s.parent1Nom || "") + '"></div>' +
           '<div class="field-row"><div class="field"><label>Téléphone</label><input type="tel" id="f-p1tel" value="' + escapeHtml(s.parent1Tel || "") + '"></div>' +
@@ -1149,6 +1153,8 @@
           prenom: document.getElementById("f-prenom").value.trim(),
           nom: document.getElementById("f-nom").value.trim(),
           age: document.getElementById("f-age").value ? parseInt(document.getElementById("f-age").value, 10) : null,
+          tel: document.getElementById("f-tel").value.trim(),
+          email: document.getElementById("f-email").value.trim(),
           parent1Nom: document.getElementById("f-p1nom").value.trim(),
           parent1Tel: document.getElementById("f-p1tel").value.trim(),
           parent1Email: document.getElementById("f-p1email").value.trim(),
