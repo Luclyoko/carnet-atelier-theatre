@@ -770,6 +770,7 @@
         html += '<button class="student-card' + (s.actif === false ? " inactive" : "") + '" data-action="open-student" data-id="' + s.id + '">' +
           '<div class="student-name">' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + "</div>" +
           '<div class="student-meta">' +
+            '<span class="pill ' + (s.paye ? "pill-green" : "pill-red") + '" title="' + (s.paye ? "A réglé l'année" : "N'a pas réglé l'année") + '">€</span>' +
             (s.age != null ? '<span class="pill pill-muted">' + s.age + " ans</span>" : "") +
             '<span class="pill pill-red">' + stats.absent + " abs.</span>" +
             '<span class="pill pill-gold">' + stats.retard + " retard(s)</span>" +
@@ -915,6 +916,7 @@
           '<div class="field"><label>Email</label><input type="email" id="f-p2email" value="' + escapeHtml(s.parent2Email || "") + '"></div></div>' +
         "</fieldset>" +
         '<div class="field"><label>Infos complémentaires</label><textarea id="f-infos" placeholder="Allergies, transport, comportement, à surveiller…">' + escapeHtml(s.infos || "") + "</textarea></div>" +
+        '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-paye" ' + (s.paye ? "checked" : "") + ' style="width:auto;"><label style="text-transform:none;font-weight:400;">A réglé l\'année</label></div>' +
         (m.student ? '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-actif" ' + (s.actif === false ? "" : "checked") + ' style="width:auto;"><label style="text-transform:none;font-weight:400;">Élève actif dans le groupe</label></div>' : "") +
         (m.student ? renderStudentHistory(s.id) : "") +
         '<div class="form-actions">' +
@@ -1153,7 +1155,8 @@
           parent2Nom: document.getElementById("f-p2nom").value.trim(),
           parent2Tel: document.getElementById("f-p2tel").value.trim(),
           parent2Email: document.getElementById("f-p2email").value.trim(),
-          infos: document.getElementById("f-infos").value.trim()
+          infos: document.getElementById("f-infos").value.trim(),
+          paye: document.getElementById("f-paye").checked
         };
         if (!data.prenom || !data.nom) { showToast("Prénom et nom requis"); return; }
         var actifEl = document.getElementById("f-actif");
