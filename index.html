@@ -332,15 +332,17 @@
     unlocked: localStorage.getItem("atelier.accessGranted") === "yes",
     lockError: "",
     groups: [],
-    students: [],
+    allStudents: [], // every student fiche across all groups — a fiche is shared across groups
+    memberships: [], // this group's membership docs { studentId, groupId, actif, paye }
+    students: [], // memberships merged with allStudents, for the CURRENT group only
     sessions: [],
     year: localStorage.getItem("atelier.year") || currentSchoolYear(),
     villeFilter: localStorage.getItem("atelier.ville") || "",
     groupId: localStorage.getItem("atelier.groupId") || null,
     tab: "eleves", // eleves | seances | bilan
     studentFilter: "",
-    modal: null, // { type: 'student'|'group'|'session'|'confirm', ... }
-    unsub: { students: null, sessions: null }
+    modal: null, // { type: 'student'|'group'|'session'|'confirm'|'add-student', ... }
+    unsub: { memberships: null, sessions: null }
   };
   var modalRenderedFor = null; // tracks which state.modal object the DOM currently reflects
   var appClickBound = false;
@@ -368,13 +370,15 @@
     Promise.all([
       state.db.collection("groups").get(),
       state.db.collection("students").get(),
+      state.db.collection("memberships").get(),
       state.db.collection("sessions").get()
     ]).then(function (res) {
       var bundle = {
         exportedAt: new Date().toISOString(),
         groups: res[0].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }),
         students: res[1].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }),
-        sessions: res[2].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+        memberships: res[2].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); }),
+        sessions: res[3].docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
       };
       var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
       var url = URL.createObjectURL(blob);
@@ -397,6 +401,13 @@
       state.db = db;
       state.dbState = "ready";
       var bootSubscribed = false;
+      // Every student fiche, across every group — fiches are shared/reusable
+      // across groups, so this list is not scoped to the current group.
+      db.collection("students").onSnapshot(function (snap) {
+        state.allStudents = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+        recomputeGroupStudents();
+        render();
+      });
       db.collection("groups").orderBy("nom", "asc").onSnapshot(function (snap) {
         state.groups = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
         if (!state.groupId) {
@@ -420,15 +431,31 @@
     }
   }
 
+  // Combine this group's membership records with the global fiches to get
+  // the list the rest of the app renders as "state.students" — the same
+  // fiche can appear, merged differently, in several groups at once.
+  function recomputeGroupStudents() {
+    state.students = state.memberships.map(function (mem) {
+      var fiche = state.allStudents.find(function (s) { return s.id === mem.studentId; }) || {};
+      return Object.assign({}, fiche, {
+        id: mem.studentId,
+        membershipId: mem.id,
+        actif: mem.actif,
+        paye: mem.paye
+      });
+    }).sort(function (a, b) { return ((a.nom || "") + (a.prenom || "")).localeCompare((b.nom || "") + (b.prenom || ""), "fr"); });
+  }
+
   function subscribeGroup(groupId) {
-    if (state.unsub.students) state.unsub.students();
+    if (state.unsub.memberships) state.unsub.memberships();
     if (state.unsub.sessions) state.unsub.sessions();
+    state.memberships = [];
     state.students = [];
     state.sessions = [];
     if (!groupId || !state.db) return;
-    state.unsub.students = state.db.collection("students").where("groupId", "==", groupId).onSnapshot(function (snap) {
-      state.students = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
-        .sort(function (a, b) { return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"); });
+    state.unsub.memberships = state.db.collection("memberships").where("groupId", "==", groupId).onSnapshot(function (snap) {
+      state.memberships = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+      recomputeGroupStudents();
       render();
     });
     // Sorted client-side (not via Firestore orderBy) so this doesn't depend on
@@ -533,11 +560,13 @@
   function deleteGroupCascade(id) {
     var db = requireDb(); if (!db) return;
     Promise.all([
-      db.collection("students").where("groupId", "==", id).get(),
+      db.collection("memberships").where("groupId", "==", id).get(),
       db.collection("sessions").where("groupId", "==", id).get()
     ]).then(function (res) {
       var deletes = [];
-      res[0].docs.forEach(function (d) { deletes.push(db.collection("students").doc(d.id).delete()); });
+      // Only the enrollment in THIS group is removed — student fiches are
+      // shared across groups, so they must survive the group's deletion.
+      res[0].docs.forEach(function (d) { deletes.push(db.collection("memberships").doc(d.id).delete()); });
       res[1].docs.forEach(function (d) { deletes.push(db.collection("sessions").doc(d.id).delete()); });
       deletes.push(db.collection("groups").doc(id).delete());
       return Promise.all(deletes);
@@ -551,16 +580,19 @@
     var db = requireDb(); if (!db) return;
     db.collection("groups").add({ nom: newName, ville: group.ville || "", annee: newYear, archive: false, creeLe: new Date().toISOString() })
       .then(function (ref) {
-        if (!carryStudents) { showToast("Nouveau groupe créé"); state.year = newYear; selectGroup(ref.id); saveNav(); return; }
-        db.collection("students").where("groupId", "==", group.id).get().then(function (snap) {
+        if (!carryStudents) { showToast("Nouveau groupe créé"); ensureVilleFilterMatches(group.ville); state.year = newYear; selectGroup(ref.id); saveNav(); return; }
+        // Re-enroll the SAME fiches into the new group's membership list —
+        // no fiche is duplicated, since it's the same student, just enrolled
+        // in a new group for the new year (payment/active status reset).
+        db.collection("memberships").where("groupId", "==", group.id).get().then(function (snap) {
           var copies = snap.docs.filter(function (d) { return d.data().actif !== false; }).map(function (d) {
-            var data = Object.assign({}, d.data());
-            data.groupId = ref.id;
-            data.creeLe = new Date().toISOString();
-            return db.collection("students").add(data);
+            return db.collection("memberships").add({
+              studentId: d.data().studentId, groupId: ref.id, actif: true, paye: false, creeLe: new Date().toISOString()
+            });
           });
           Promise.all(copies).then(function () {
             showToast("Groupe et élèves reconduits pour " + newYear);
+            ensureVilleFilterMatches(group.ville);
             state.year = newYear;
             selectGroup(ref.id);
             saveNav();
@@ -569,20 +601,47 @@
       });
   }
 
+  // `data` may carry `actif`/`paye`, which belong to the membership, not the
+  // fiche — they're split off before the two writes.
   function createStudent(data) {
     var db = requireDb(); if (!db) return;
-    data.groupId = state.groupId;
-    data.actif = true;
+    var paye = !!data.paye;
+    delete data.paye;
     data.creeLe = new Date().toISOString();
-    db.collection("students").add(data).then(function () { showToast("Élève ajouté"); });
+    db.collection("students").add(data).then(function (ref) {
+      return db.collection("memberships").add({
+        studentId: ref.id, groupId: state.groupId, actif: true, paye: paye, creeLe: new Date().toISOString()
+      });
+    }).then(function () { showToast("Élève créé et ajouté au groupe"); });
   }
-  function updateStudent(id, patch) {
+  function addExistingStudentToGroup(studentId) {
     var db = requireDb(); if (!db) return;
-    db.collection("students").doc(id).update(patch).then(function () { showToast("Fiche mise à jour"); });
+    db.collection("memberships").add({
+      studentId: studentId, groupId: state.groupId, actif: true, paye: false, creeLe: new Date().toISOString()
+    }).then(function () { showToast("Élève ajouté au groupe"); });
   }
-  function deleteStudent(id) {
+  function updateStudent(student, patch) {
     var db = requireDb(); if (!db) return;
-    db.collection("students").doc(id).delete().then(function () { showToast("Élève supprimé"); closeModal(); });
+    var membershipPatch = {};
+    if (Object.prototype.hasOwnProperty.call(patch, "actif")) { membershipPatch.actif = patch.actif; delete patch.actif; }
+    if (Object.prototype.hasOwnProperty.call(patch, "paye")) { membershipPatch.paye = patch.paye; delete patch.paye; }
+    var writes = [db.collection("students").doc(student.id).update(patch)];
+    if (Object.keys(membershipPatch).length && student.membershipId) {
+      writes.push(db.collection("memberships").doc(student.membershipId).update(membershipPatch));
+    }
+    Promise.all(writes).then(function () { showToast("Fiche mise à jour"); });
+  }
+  function removeStudentFromGroup(membershipId) {
+    var db = requireDb(); if (!db) return;
+    db.collection("memberships").doc(membershipId).delete().then(function () { showToast("Élève retiré du groupe"); closeModal(); });
+  }
+  function deleteStudentEverywhere(studentId) {
+    var db = requireDb(); if (!db) return;
+    db.collection("memberships").where("studentId", "==", studentId).get().then(function (snap) {
+      var deletes = snap.docs.map(function (d) { return db.collection("memberships").doc(d.id).delete(); });
+      deletes.push(db.collection("students").doc(studentId).delete());
+      return Promise.all(deletes);
+    }).then(function () { showToast("Fiche supprimée définitivement"); closeModal(); });
   }
 
   function createSession(data) {
@@ -896,11 +955,27 @@
     }
     if (m.type === "duplicate-group") {
       return '<div class="modal-head"><h3>Reconduire ce groupe</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
-        '<p class="inline-note">Crée un nouveau groupe pour l\'année suivante, en reprenant si besoin la liste des élèves actifs (nom, prénom, coordonnées des parents).</p>' +
+        '<p class="inline-note">Crée un nouveau groupe pour l\'année suivante, en y réinscrivant si besoin les élèves actuellement actifs (mêmes fiches, statut paiement remis à zéro).</p>' +
         '<div class="field"><label>Nouvelle année</label><input type="text" id="f-newyear" value="' + escapeHtml(m.suggestedYear) + '"></div>' +
         '<div class="field"><label>Nom du nouveau groupe</label><input type="text" id="f-newname" value="' + escapeHtml(m.group.nom) + '"></div>' +
         '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-carry" checked style="width:auto;"><label style="text-transform:none;font-weight:400;">Copier les élèves actifs dans le nouveau groupe</label></div>' +
         '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-duplicate">Créer</button></div>';
+    }
+    if (m.type === "add-student") {
+      var alreadyIds = state.students.map(function (x) { return x.id; });
+      var candidates = state.allStudents.filter(function (x) { return alreadyIds.indexOf(x.id) === -1; });
+      var q = (m.query || "").trim().toLowerCase();
+      var filtered = (q ? candidates.filter(function (x) { return ((x.prenom || "") + " " + (x.nom || "")).toLowerCase().indexOf(q) !== -1; }) : candidates)
+        .sort(function (a, b) { return ((a.nom || "") + (a.prenom || "")).localeCompare((b.nom || "") + (b.prenom || ""), "fr"); });
+      var rows = filtered.slice(0, 40).map(function (x) {
+        return '<div class="history-item"><span>' + escapeHtml(x.prenom || "") + " " + escapeHtml(upperNom(x.nom || "")) + '</span><button type="button" class="btn btn-sm" data-action="add-existing-student" data-id="' + x.id + '">Ajouter</button></div>';
+      }).join("");
+      return '<div class="modal-head"><h3>Ajouter un élève</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        (candidates.length ? '<div class="field"><label>Élève déjà connu</label><input type="text" id="f-student-search" placeholder="Rechercher parmi les fiches existantes…" value="' + escapeHtml(m.query || "") + '"></div>' : "") +
+        (candidates.length ? (rows || '<p class="inline-note">Aucun résultat.</p>') : '<p class="inline-note">Aucune autre fiche élève n\'est encore enregistrée.</p>') +
+        '<div class="divider"></div>' +
+        '<button type="button" class="btn btn-accent" style="width:100%;justify-content:center;" data-action="new-student-fiche">' + ICONS.plus + " Créer une nouvelle fiche</button>" +
+        '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button></div>';
     }
     if (m.type === "student") {
       if (m.student && m.mode !== "edit") {
@@ -931,10 +1006,11 @@
         (m.student ? '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-actif" ' + (s.actif === false ? "" : "checked") + ' style="width:auto;"><label style="text-transform:none;font-weight:400;">Élève actif dans le groupe</label></div>' : "") +
         (m.student ? renderStudentHistory(s.id) : "") +
         '<div class="form-actions">' +
-          (m.student ? '<button class="btn btn-danger" data-action="delete-student" data-id="' + s.id + '">Supprimer</button>' : "") +
+          (m.student ? '<button class="btn btn-danger" data-action="remove-from-group" data-id="' + s.membershipId + '">Retirer de ce groupe</button>' : "") +
           '<button class="btn" data-action="close-modal">Annuler</button>' +
           '<button class="btn btn-accent" data-action="save-student"' + (m.student ? ' data-id="' + s.id + '"' : "") + ">Enregistrer</button>" +
-        "</div>";
+        "</div>" +
+        (m.student ? '<p style="text-align:center;margin-top:12px;"><button type="button" class="btn btn-ghost btn-sm" style="color:var(--text-muted);" data-action="delete-student-everywhere" data-id="' + s.id + '">Supprimer définitivement cette fiche (tous groupes)</button></p>' : "");
     }
     if (m.type === "session") {
       return sessionModalBody(m);
@@ -1116,7 +1192,7 @@
         openModal({ type: "duplicate-group", group: g, suggestedYear: suggested });
         break;
       }
-      case "new-student": openModal({ type: "student", student: null, mode: "edit" }); break;
+      case "new-student": openModal({ type: "add-student", query: "" }); break;
       case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id), mode: "view" }); break;
       case "new-session": openModal({ type: "session", session: null }); break;
       case "open-session": {
@@ -1210,12 +1286,25 @@
         if (!data.prenom || !data.nom) { showToast("Prénom et nom requis"); return; }
         var actifEl = document.getElementById("f-actif");
         if (actifEl) data.actif = actifEl.checked;
-        if (m.student) updateStudent(m.student.id, data); else createStudent(data);
+        if (m.student) updateStudent(m.student, data); else createStudent(data);
         closeModal();
         return;
       }
-      if (action === "delete-student") {
-        confirmAction("Supprimer définitivement cette fiche élève ? L'historique des séances passées conservera son nom mais plus ses coordonnées.", function () { deleteStudent(btn.dataset.id); });
+      if (action === "remove-from-group") {
+        confirmAction("Retirer cet élève de ce groupe ? Sa fiche et son historique dans les autres groupes seront conservés.", function () { removeStudentFromGroup(btn.dataset.id); });
+        return;
+      }
+      if (action === "delete-student-everywhere") {
+        confirmAction("Supprimer définitivement cette fiche élève, y compris son inscription dans TOUS les groupes ? Cette action est irréversible.", function () { deleteStudentEverywhere(btn.dataset.id); });
+        return;
+      }
+      if (action === "new-student-fiche") {
+        openModal({ type: "student", student: null, mode: "edit" });
+        return;
+      }
+      if (action === "add-existing-student") {
+        addExistingStudentToGroup(btn.dataset.id);
+        closeModal();
         return;
       }
       if (action === "set-status") {
@@ -1254,6 +1343,12 @@
     overlay.addEventListener("input", function (e) {
       if (e.target.dataset.action === "set-retard-min") {
         state.modal._presences[e.target.dataset.student].minutesRetard = e.target.value ? parseInt(e.target.value, 10) : null;
+      }
+      if (e.target.id === "f-student-search") {
+        state.modal.query = e.target.value;
+        renderModal();
+        var el = document.getElementById("f-student-search");
+        if (el) { el.focus(); var v = el.value; el.value = ""; el.value = v; }
       }
     });
     overlay.addEventListener("change", function (e) {
