@@ -582,7 +582,18 @@
   // ---------------------------------------------------------------------
   // Render: shell
   // ---------------------------------------------------------------------
-  var ACCESS_CODE = "THEATRE2026";
+  // Empreinte SHA-256 du code d'accès — le code lui-même n'apparaît nulle
+  // part dans le code source ni dans la page servie, seule cette empreinte.
+  var ACCESS_CODE_HASH = "aa45c55a3807129f9e0a1a62df464bb41e50fce41f708fb40fc004bc088373c1";
+
+  function sha256Hex(text) {
+    var data = new TextEncoder().encode(text);
+    return crypto.subtle.digest("SHA-256", data).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
 
   function renderLockScreen() {
     return (
@@ -599,16 +610,18 @@
   function attemptUnlock() {
     var input = document.getElementById("lock-code");
     var value = input ? input.value : "";
-    if (value === ACCESS_CODE) {
-      state.unlocked = true;
-      state.lockError = "";
-      localStorage.setItem("atelier.accessGranted", "yes");
-      render();
-      initDb();
-    } else {
-      state.lockError = "Code incorrect.";
-      render();
-    }
+    sha256Hex(value).then(function (hash) {
+      if (hash === ACCESS_CODE_HASH) {
+        state.unlocked = true;
+        state.lockError = "";
+        localStorage.setItem("atelier.accessGranted", "yes");
+        render();
+        initDb();
+      } else {
+        state.lockError = "Code incorrect.";
+        render();
+      }
+    });
   }
 
   function render() {
