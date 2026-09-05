@@ -495,18 +495,34 @@
     return state.db;
   }
 
+  // If the active city filter would hide the group just created/edited, clear
+  // it — otherwise the group vanishes from the tab strip right after you made it.
+  function ensureVilleFilterMatches(ville) {
+    if (state.villeFilter && state.villeFilter !== (ville || "")) {
+      state.villeFilter = "";
+      saveNav();
+    }
+  }
+
   function createGroup(data) {
     var db = requireDb(); if (!db) return;
     db.collection("groups").add({
       nom: data.nom, annee: data.annee, ville: data.ville || "", archive: false, creeLe: new Date().toISOString()
     }).then(function (ref) {
       showToast("Groupe créé");
+      ensureVilleFilterMatches(data.ville);
       selectGroup(ref.id);
     });
   }
   function updateGroup(id, patch) {
     var db = requireDb(); if (!db) return;
-    db.collection("groups").doc(id).update(patch).then(function () { showToast("Groupe mis à jour"); });
+    db.collection("groups").doc(id).update(patch).then(function () {
+      showToast("Groupe mis à jour");
+      if (Object.prototype.hasOwnProperty.call(patch, "ville")) {
+        ensureVilleFilterMatches(patch.ville);
+        render();
+      }
+    });
   }
   function archiveGroup(id, archive) {
     updateGroup(id, { archive: !!archive });
