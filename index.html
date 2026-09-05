@@ -709,7 +709,7 @@
     var groups = groupsForYear(state.year);
     var chips = groups.map(function (g) {
       var cls = "group-chip" + (g.id === state.groupId ? " active" : "") + (g.archive ? " archived" : "");
-      return '<button class="' + cls + '" data-action="select-group" data-id="' + g.id + '"><span class="dot"></span>' + escapeHtml(g.nom) + (g.ville ? ' <span style="opacity:.7;">· ' + escapeHtml(g.ville) + "</span>" : "") + "</button>";
+      return '<button class="' + cls + '" data-action="select-group" data-id="' + g.id + '"><span class="dot"></span>' + escapeHtml(g.nom) + (g.ville && !state.villeFilter ? ' <span style="opacity:.7;">· ' + escapeHtml(g.ville) + "</span>" : "") + "</button>";
     }).join("");
     return (
       '<div class="group-strip">' + chips +
@@ -729,7 +729,7 @@
       );
     }
     var html = "";
-    html += '<div class="section-head"><h2>' + escapeHtml(group.nom) + (group.ville ? ' <span class="muted" style="font-size:15px;font-family:var(--font-body);font-weight:400;">— ' + escapeHtml(group.ville) + "</span>" : "") + '</h2><div style="display:flex;gap:6px;">' +
+    html += '<div class="section-head"><h2>' + escapeHtml(group.nom) + (group.ville && !state.villeFilter ? ' <span class="muted" style="font-size:15px;font-family:var(--font-body);font-weight:400;">— ' + escapeHtml(group.ville) + "</span>" : "") + '</h2><div style="display:flex;gap:6px;">' +
       '<button class="btn btn-sm" data-action="edit-group">Modifier</button>' +
       '<button class="btn btn-sm" data-action="duplicate-group">Reconduire l\'an prochain</button>' +
       "</div></div>";
