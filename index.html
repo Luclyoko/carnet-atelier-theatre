@@ -202,6 +202,14 @@
   .info-row { margin-bottom: 12px; }
   .info-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
 
+  .addr-suggestions:not(:empty) {
+    position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 30;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: var(--shadow); max-height: 220px; overflow-y: auto;
+  }
+  .addr-suggestion { padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
+  .addr-suggestion:hover { background: var(--surface-alt); }
+
   .session-row {
     display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--border);
     cursor: pointer;
@@ -1003,7 +1011,7 @@
           '<div class="field" style="flex:1;min-width:140px;"><label>Téléphone élève</label><input type="tel" id="f-tel" value="' + escapeHtml(s.tel || "") + '"></div>' +
           '<div class="field" style="flex:1;min-width:180px;"><label>Email élève</label><input type="email" id="f-email" value="' + escapeHtml(s.email || "") + '"></div>' +
         "</div>" +
-        '<div class="field"><label>Adresse</label><input type="text" id="f-adresse" value="' + escapeHtml(s.adresse || "") + '"></div>' +
+        '<div class="field" style="position:relative;"><label>Adresse</label><input type="text" id="f-adresse" autocomplete="off" value="' + escapeHtml(s.adresse || "") + '"><div id="f-adresse-suggestions" class="addr-suggestions"></div></div>' +
         '<fieldset><legend>Parent / responsable 1</legend>' +
           '<div class="field"><label>Nom</label><input type="text" id="f-p1nom" value="' + escapeHtml(s.parent1Nom || "") + '"></div>' +
           '<div class="field-row"><div class="field"><label>Téléphone</label><input type="tel" id="f-p1tel" value="' + escapeHtml(s.parent1Tel || "") + '"></div>' +
@@ -1029,6 +1037,29 @@
       return sessionModalBody(m);
     }
     return "";
+  }
+
+  // Autocomplete on the "Adresse" field via the French government's free,
+  // keyless Base Adresse Nationale API — no external library needed.
+  var addressDebounceTimer = null;
+  function handleAddressInput(input) {
+    clearTimeout(addressDebounceTimer);
+    var query = input.value.trim();
+    var box = document.getElementById("f-adresse-suggestions");
+    if (query.length < 3) { if (box) box.innerHTML = ""; return; }
+    addressDebounceTimer = setTimeout(function () {
+      fetch("https://api-adresse.data.gouv.fr/search/?q=" + encodeURIComponent(query) + "&limit=5")
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var box2 = document.getElementById("f-adresse-suggestions");
+          if (!box2) return; // modal closed or field gone since the request was made
+          var features = (data && data.features) || [];
+          box2.innerHTML = features.map(function (f) {
+            return '<div class="addr-suggestion" data-label="' + escapeHtml(f.properties.label) + '">' + escapeHtml(f.properties.label) + "</div>";
+          }).join("");
+        })
+        .catch(function () {});
+    }, 300);
   }
 
   function infoRow(label, value, href) {
@@ -1234,6 +1265,12 @@
     if (!overlay) return;
     overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) closeModal(); });
     overlay.addEventListener("click", function (e) {
+      if (e.target.classList && e.target.classList.contains("addr-suggestion")) {
+        var addrInput = document.getElementById("f-adresse");
+        if (addrInput) addrInput.value = e.target.dataset.label;
+        e.target.parentNode.innerHTML = "";
+        return;
+      }
       var btn = e.target.closest("[data-action]");
       if (!btn) return;
       var action = btn.dataset.action;
@@ -1364,6 +1401,19 @@
         renderModal();
         var el = document.getElementById("f-student-search");
         if (el) { el.focus(); var v = el.value; el.value = ""; el.value = v; }
+      }
+      if (e.target.id === "f-adresse") {
+        handleAddressInput(e.target);
+      }
+    });
+    overlay.addEventListener("focusout", function (e) {
+      if (e.target.id === "f-adresse") {
+        // Delay so a click on a suggestion (which fires after blur) still lands
+        // before the list is wiped.
+        setTimeout(function () {
+          var box = document.getElementById("f-adresse-suggestions");
+          if (box) box.innerHTML = "";
+        }, 200);
       }
     });
     overlay.addEventListener("change", function (e) {
