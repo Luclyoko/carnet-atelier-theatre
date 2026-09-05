@@ -417,8 +417,11 @@
         .sort(function (a, b) { return (a.nom + a.prenom).localeCompare(b.nom + b.prenom, "fr"); });
       render();
     });
-    state.unsub.sessions = state.db.collection("sessions").where("groupId", "==", groupId).orderBy("date", "desc").onSnapshot(function (snap) {
-      state.sessions = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
+    // Sorted client-side (not via Firestore orderBy) so this doesn't depend on
+    // a composite index existing for every groupId + date combination.
+    state.unsub.sessions = state.db.collection("sessions").where("groupId", "==", groupId).onSnapshot(function (snap) {
+      state.sessions = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+        .sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
       render();
     });
   }
