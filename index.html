@@ -231,11 +231,12 @@
   .session-counts { display: flex; gap: 6px; font-family: var(--font-mono); font-size: 11.5px; flex: none; }
 
   .attend-row {
-    display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    padding: 9px 0; border-bottom: 1px solid var(--border);
   }
   .attend-row:last-child { border-bottom: none; }
+  .attend-row-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .attend-name { flex: 1; min-width: 130px; font-weight: 600; }
-  .status-toggle { display: flex; gap: 4px; }
+  .status-toggle { display: flex; gap: 4px; flex: none; }
   .status-btn {
     border: 1px solid var(--border); background: var(--surface); color: var(--text-muted);
     font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 7px; cursor: pointer;
@@ -245,8 +246,8 @@
   .status-btn[data-status="absent"].active { background: var(--red-soft); border-color: var(--red); color: var(--red); }
   .status-btn[data-status="excuse"].active { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
   .pill-accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
-  .retard-min { width: 64px; font-family: var(--font-mono); }
-  .excuse-motif { width: 180px; }
+  .retard-min { width: 100px; font-family: var(--font-mono); margin-top: 8px; }
+  .excuse-motif { width: 100%; max-width: 320px; margin-top: 8px; }
 
   table.bilan { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   table.bilan th, table.bilan td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
@@ -1244,11 +1245,13 @@
         return '<button type="button" class="status-btn' + (p.statut === key ? " active" : "") + '" data-action="set-status" data-student="' + studentId + '" data-status="' + key + '">' + label + "</button>";
       }
       return '<div class="attend-row" data-student-row="' + studentId + '">' +
-        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) + "</span>" +
-        '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + sb("excuse", "Excusé") + "</div>" +
+        '<div class="attend-row-main">' +
+          '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) + "</span>" +
+          '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + sb("excuse", "Excusé") + "</div>" +
+          '<button type="button" class="btn btn-ghost btn-sm" data-action="remove-from-session" data-student="' + studentId + '" title="Retirer de cette séance">&times;</button>' +
+        "</div>" +
         (p.statut === "retard" ? '<input type="number" min="0" class="retard-min" placeholder="min" data-action="set-retard-min" data-student="' + studentId + '" value="' + (p.minutesRetard || "") + '">' : "") +
         (p.statut === "excuse" ? '<input type="text" class="excuse-motif" placeholder="Motif (optionnel)" data-action="set-excuse-motif" data-student="' + studentId + '" value="' + escapeHtml(p.commentaire || "") + '">' : "") +
-        '<button type="button" class="btn btn-ghost btn-sm" data-action="remove-from-session" data-student="' + studentId + '" title="Retirer de cette séance">&times;</button>' +
         "</div>";
     }).join("");
 
