@@ -114,7 +114,7 @@
   .btn {
     display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
     background: var(--surface); color: var(--text); padding: 7px 13px; border-radius: 8px;
-    font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap;
+    font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none;
   }
   .btn:hover { border-color: var(--text-muted); }
   .btn-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
@@ -1334,6 +1334,19 @@
     return html;
   }
 
+  // A ready-to-send SMS draft for an absent student's parent — no server,
+  // no cost: it just opens the phone's own Messages app pre-filled, and the
+  // animateur taps send. "?&body=" (rather than plain "?body=" or "&body=")
+  // is the one form that both iOS and Android honor.
+  function buildAbsenceSmsHref(st, dateStr, groupNom) {
+    var rawTel = (st.parent1Tel || st.parent2Tel || st.tel || "").trim();
+    if (!rawTel) return null;
+    var tel = rawTel.replace(/[\s.\-()]/g, "");
+    var message = "Bonjour, " + st.prenom + " " + upperNom(st.nom) + ' a été noté(e) absent(e) à la séance de "' +
+      groupNom + '" du ' + formatDateFR(dateStr) + ". Merci de nous prévenir en cas d'absence connue à l'avance.";
+    return "sms:" + tel + "?&body=" + encodeURIComponent(message);
+  }
+
   function sessionModalBody(m) {
     var session = m.session;
     var isNew = !session;
@@ -1376,6 +1389,12 @@
         "</div>" +
         (p.statut === "retard" ? '<input type="number" min="0" class="retard-min" placeholder="min" data-action="set-retard-min" data-student="' + studentId + '" value="' + (p.minutesRetard || "") + '">' : "") +
         (p.statut === "excuse" ? '<input type="text" class="excuse-motif" placeholder="Motif (optionnel)" data-action="set-excuse-motif" data-student="' + studentId + '" value="' + escapeHtml(p.commentaire || "") + '">' : "") +
+        (p.statut === "absent" ? (function () {
+          var smsHref = buildAbsenceSmsHref(st, date, (currentGroup() || {}).nom || "");
+          return smsHref
+            ? '<a class="btn btn-sm" style="margin-top:8px;" href="' + escapeHtml(smsHref) + '">' + ICONS.phone + " Prévenir par SMS</a>"
+            : '<p class="inline-note" style="margin:8px 0 0;">Aucun numéro enregistré pour prévenir par SMS.</p>';
+        })() : "") +
         "</div>";
     }).join("");
 
