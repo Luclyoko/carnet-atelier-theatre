@@ -1,0 +1,16 @@
+{
+  "name": "Carnet d'atelier — Théâtre",
+  "short_name": "Carnet d'atelier",
+  "description": "Fiches élèves, appel et suivi des séances pour les ateliers théâtre.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#17130f",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
