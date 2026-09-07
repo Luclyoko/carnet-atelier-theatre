@@ -338,6 +338,26 @@
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
   }
 
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    // Fallback for browsers/contexts without the async Clipboard API.
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      if (ok) resolve(); else reject(new Error("copy failed"));
+    });
+  }
+
   var ICONS = {
     mask: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c-4 0-7 2-7 5 0 2 1 3 1 5 0 3 2.5 5 6 5s6-2 6-5c0-2 1-3 1-5 0-3-3-5-7-5Z"/><path d="M8.5 10.5c.5 1 1 1.3 1.5 0M14 10.5c.5 1 1 1.3 1.5 0M9 15c1 1 5 1 6 0"/></svg>',
     phone: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1.1.5 1.1 1.1V20c0 .6-.5 1.1-1.1 1.1C10.6 21.1 2.9 13.4 2.9 3.1 2.9 2.5 3.4 2 4 2h3.3c.6 0 1.1.5 1.1 1.1 0 1.2.2 2.4.6 3.5.1.3 0 .7-.2 1L6.6 10.8Z"/></svg>',
@@ -894,6 +914,24 @@
   // ---------------------------------------------------------------------
   // Tab: Élèves
   // ---------------------------------------------------------------------
+  // Uses the student's own email when present, otherwise falls back to a
+  // parent's — most young students have no email of their own, so a strict
+  // "student email only" version would come back empty for those groups.
+  function copyGroupEmails() {
+    var seen = {};
+    var emails = [];
+    state.students.filter(function (s) { return s.actif !== false; }).forEach(function (s) {
+      var email = (s.email || s.parent1Email || s.parent2Email || "").trim();
+      if (email && !seen[email.toLowerCase()]) { seen[email.toLowerCase()] = true; emails.push(email); }
+    });
+    if (!emails.length) { showToast("Aucune adresse email trouvée pour ce groupe"); return; }
+    copyToClipboard(emails.join(", ")).then(function () {
+      showToast(emails.length + " adresse(s) copiée(s) dans le presse-papier");
+    }).catch(function () {
+      showToast("Échec de la copie — réessayez");
+    });
+  }
+
   function renderElevesTab() {
     var list = state.students.filter(function (s) {
       if (!state.studentFilter) return true;
@@ -901,7 +939,10 @@
       return (s.nom + " " + s.prenom).toLowerCase().indexOf(q) !== -1;
     });
     var html = '<div class="section-head"><span class="count-tag">' + state.students.length + " élève(s)</span>" +
-      '<button class="btn btn-accent btn-sm" data-action="new-student">' + ICONS.plus + " Ajouter un élève</button></div>";
+      '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-sm" data-action="copy-emails" title="Copie les emails des élèves actifs (ou de leurs parents si l\'élève n\'en a pas) dans le presse-papier">' + ICONS.mail + " Copier les emails</button>" +
+        '<button class="btn btn-accent btn-sm" data-action="new-student">' + ICONS.plus + " Ajouter un élève</button>" +
+      "</div></div>";
     if (state.students.length > 6) {
       html += '<div class="field" style="max-width:280px;margin-bottom:16px;"><input type="text" placeholder="Rechercher un élève…" id="student-filter" value="' + escapeHtml(state.studentFilter) + '"></div>';
     }
@@ -1347,6 +1388,7 @@
         break;
       }
       case "new-student": openModal({ type: "add-student", query: "" }); break;
+      case "copy-emails": copyGroupEmails(); break;
       case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id), mode: "view" }); break;
       case "new-session": openModal({ type: "session", session: null }); break;
       case "cancel-excuse": cancelExcusedAbsence(btn.dataset.id); break;
