@@ -929,6 +929,9 @@
   // the student has none; "all" = every address on file (student + both
   // parents), for a wider reach.
   function emailsFromMemberships(memberships, mode) {
+    // `seen` spans the whole loop (not reset per student), so an address
+    // shared across fiches — e.g. siblings using the same parent email —
+    // is still only added once to the final list.
     var seen = {};
     var emails = [];
     memberships.filter(function (m) { return m.actif !== false; }).forEach(function (m) {
