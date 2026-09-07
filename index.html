@@ -246,6 +246,7 @@
   .status-btn[data-status="excuse"].active { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
   .pill-accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
   .retard-min { width: 64px; font-family: var(--font-mono); }
+  .excuse-motif { width: 180px; }
 
   table.bilan { width: 100%; border-collapse: collapse; font-size: 13.5px; }
   table.bilan th, table.bilan td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
@@ -1243,11 +1244,10 @@
         return '<button type="button" class="status-btn' + (p.statut === key ? " active" : "") + '" data-action="set-status" data-student="' + studentId + '" data-status="' + key + '">' + label + "</button>";
       }
       return '<div class="attend-row" data-student-row="' + studentId + '">' +
-        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) +
-          (p.statut === "excuse" && p.commentaire ? ' <span class="muted" style="font-weight:400;font-size:12px;">(' + escapeHtml(p.commentaire) + ")</span>" : "") +
-        "</span>" +
+        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) + "</span>" +
         '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + sb("excuse", "Excusé") + "</div>" +
         (p.statut === "retard" ? '<input type="number" min="0" class="retard-min" placeholder="min" data-action="set-retard-min" data-student="' + studentId + '" value="' + (p.minutesRetard || "") + '">' : "") +
+        (p.statut === "excuse" ? '<input type="text" class="excuse-motif" placeholder="Motif (optionnel)" data-action="set-excuse-motif" data-student="' + studentId + '" value="' + escapeHtml(p.commentaire || "") + '">' : "") +
         '<button type="button" class="btn btn-ghost btn-sm" data-action="remove-from-session" data-student="' + studentId + '" title="Retirer de cette séance">&times;</button>' +
         "</div>";
     }).join("");
@@ -1516,6 +1516,9 @@
     overlay.addEventListener("input", function (e) {
       if (e.target.dataset.action === "set-retard-min") {
         state.modal._presences[e.target.dataset.student].minutesRetard = e.target.value ? parseInt(e.target.value, 10) : null;
+      }
+      if (e.target.dataset.action === "set-excuse-motif") {
+        state.modal._presences[e.target.dataset.student].commentaire = e.target.value;
       }
       if (e.target.id === "f-student-search") {
         state.modal.query = e.target.value;
