@@ -279,6 +279,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 (function () {
   "use strict";
@@ -337,7 +338,9 @@
   var state = {
     db: null,
     dbState: "connecting", // connecting | ready | unavailable
-    unlocked: localStorage.getItem("atelier.accessGranted") === "yes",
+    unlocked: false,
+    authChecking: true, // true until Firebase Auth reports the restored session (or none)
+    authUser: null,
     lockError: "",
     groups: [],
     allStudents: [], // every student fiche across all groups — a fiche is shared across groups
@@ -401,10 +404,21 @@
     }).catch(function () { showToast("Échec de l'export"); });
   }
 
+  function initAuth() {
+    if (!window.firebase) { state.authChecking = false; state.dbState = "unavailable"; render(); return; }
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    firebase.auth().onAuthStateChanged(function (user) {
+      state.authChecking = false;
+      state.authUser = user;
+      state.unlocked = !!user;
+      render();
+      if (user) initDb();
+    });
+  }
+
   function initDb() {
     try {
       if (!window.firebase) { state.dbState = "unavailable"; render(); return; }
-      if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
       var db = firebase.firestore();
       state.db = db;
       state.dbState = "ready";
@@ -687,46 +701,43 @@
   // ---------------------------------------------------------------------
   // Render: shell
   // ---------------------------------------------------------------------
-  // Empreinte SHA-256 du code d'accès — le code lui-même n'apparaît nulle
-  // part dans le code source ni dans la page servie, seule cette empreinte.
-  var ACCESS_CODE_HASH = "aa45c55a3807129f9e0a1a62df464bb41e50fce41f708fb40fc004bc088373c1";
-
-  function sha256Hex(text) {
-    var data = new TextEncoder().encode(text);
-    return crypto.subtle.digest("SHA-256", data).then(function (buf) {
-      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
-        return b.toString(16).padStart(2, "0");
-      }).join("");
-    });
-  }
-
   function renderLockScreen() {
+    if (state.authChecking) {
+      return '<div class="lock-screen"><div class="card lock-card">' +
+        '<div class="brand">' + ICONS.mask + '<span class="brand-title">Carnet d\'atelier</span></div>' +
+        '<p class="muted" style="font-size:13px;margin:6px 0 0;">Connexion…</p>' +
+      "</div></div>";
+    }
     return (
       '<div class="lock-screen"><div class="card lock-card">' +
         '<div class="brand">' + ICONS.mask + '<span class="brand-title">Carnet d\'atelier</span></div>' +
-        '<p class="muted" style="font-size:13px;margin:6px 0 18px;">Accès réservé aux animateurs — entrez le code qui vous a été communiqué.</p>' +
+        '<p class="muted" style="font-size:13px;margin:6px 0 18px;">Accès réservé aux animateurs — connectez-vous avec le compte qui vous a été créé.</p>' +
         (state.lockError ? '<p class="lock-error">' + escapeHtml(state.lockError) + "</p>" : "") +
-        '<div class="field"><input type="password" id="lock-code" placeholder="Code d\'accès" autocomplete="off"></div>' +
-        '<button class="btn btn-accent" style="width:100%;justify-content:center;" data-action="unlock">Entrer</button>' +
+        '<div class="field"><input type="email" id="login-email" placeholder="Email" autocomplete="username"></div>' +
+        '<div class="field"><input type="password" id="login-password" placeholder="Mot de passe" autocomplete="current-password"></div>' +
+        '<button class="btn btn-accent" style="width:100%;justify-content:center;" data-action="login">Se connecter</button>' +
       "</div></div>"
     );
   }
 
-  function attemptUnlock() {
-    var input = document.getElementById("lock-code");
-    var value = input ? input.value : "";
-    sha256Hex(value).then(function (hash) {
-      if (hash === ACCESS_CODE_HASH) {
-        state.unlocked = true;
-        state.lockError = "";
-        localStorage.setItem("atelier.accessGranted", "yes");
-        render();
-        initDb();
-      } else {
-        state.lockError = "Code incorrect.";
-        render();
-      }
+  function attemptLogin() {
+    var emailEl = document.getElementById("login-email");
+    var passEl = document.getElementById("login-password");
+    var email = emailEl ? emailEl.value.trim() : "";
+    var password = passEl ? passEl.value : "";
+    if (!email || !password) { state.lockError = "Entrez votre email et votre mot de passe."; render(); return; }
+    state.lockError = "";
+    firebase.auth().signInWithEmailAndPassword(email, password).catch(function (err) {
+      var code = err && err.code;
+      state.lockError = (code === "auth/too-many-requests") ? "Trop de tentatives — réessayez dans quelques minutes."
+        : (code === "auth/user-disabled") ? "Ce compte a été désactivé."
+        : "Email ou mot de passe incorrect.";
+      render();
     });
+  }
+
+  function logout() {
+    firebase.auth().signOut();
   }
 
   function render() {
@@ -779,6 +790,7 @@
         villeSelect +
         '<button class="btn btn-sm" data-action="new-year">' + ICONS.plus + ' Année</button>' +
         '<button class="btn btn-sm" data-action="export-data">Exporter toutes les données</button>' +
+        '<button class="btn btn-sm btn-ghost" data-action="logout" title="' + escapeHtml(state.authUser && state.authUser.email || "") + '">Se déconnecter</button>' +
       '</div></div>'
     );
   }
@@ -1171,12 +1183,13 @@
   // ---------------------------------------------------------------------
   function bindEvents() {
     var app = document.getElementById("app");
-    var lockInput = document.getElementById("lock-code");
-    if (lockInput) {
-      lockInput.focus();
-      lockInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") attemptUnlock();
-      });
+    var loginEmail = document.getElementById("login-email");
+    var loginPassword = document.getElementById("login-password");
+    if (loginEmail) {
+      loginEmail.focus();
+      var onEnter = function (e) { if (e.key === "Enter") attemptLogin(); };
+      loginEmail.addEventListener("keydown", onEnter);
+      if (loginPassword) loginPassword.addEventListener("keydown", onEnter);
     }
     var yearSelect = document.getElementById("year-select");
     if (yearSelect) {
@@ -1224,7 +1237,8 @@
     if (!btn) return;
     var action = btn.dataset.action;
     switch (action) {
-      case "unlock": attemptUnlock(); break;
+      case "login": attemptLogin(); break;
+      case "logout": logout(); break;
       case "retry-db": state.dbState = "connecting"; render(); initDb(); break;
       case "select-group": selectGroup(btn.dataset.id); break;
       case "set-tab": state.tab = btn.dataset.tab; render(); break;
@@ -1453,7 +1467,7 @@
   // Boot
   // ---------------------------------------------------------------------
   render();
-  if (state.unlocked) initDb();
+  initAuth();
 })();
 </script>
 </body>
