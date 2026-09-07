@@ -914,21 +914,66 @@
   // ---------------------------------------------------------------------
   // Tab: Élèves
   // ---------------------------------------------------------------------
-  // Uses the student's own email when present, otherwise falls back to a
-  // parent's — most young students have no email of their own, so a strict
-  // "student email only" version would come back empty for those groups.
-  function copyGroupEmails() {
+  // Scope: which groups' rosters to draw from.
+  function targetGroupIdsForScope(scope) {
+    if (scope === "group") return [state.groupId];
+    var g = currentGroup();
+    if (scope === "city") {
+      var ville = (g && g.ville) || "";
+      return state.groups.filter(function (x) { return !x.archive && (x.ville || "") === ville; }).map(function (x) { return x.id; });
+    }
+    return state.groups.filter(function (x) { return !x.archive; }).map(function (x) { return x.id; }); // "all"
+  }
+
+  // Mode: "student" = student's own email, or a parent's as a fallback when
+  // the student has none; "all" = every address on file (student + both
+  // parents), for a wider reach.
+  function emailsFromMemberships(memberships, mode) {
     var seen = {};
     var emails = [];
-    state.students.filter(function (s) { return s.actif !== false; }).forEach(function (s) {
-      var email = (s.email || s.parent1Email || s.parent2Email || "").trim();
-      if (email && !seen[email.toLowerCase()]) { seen[email.toLowerCase()] = true; emails.push(email); }
+    memberships.filter(function (m) { return m.actif !== false; }).forEach(function (m) {
+      var fiche = state.allStudents.find(function (s) { return s.id === m.studentId; });
+      if (!fiche) return;
+      var candidates = mode === "all"
+        ? [fiche.email, fiche.parent1Email, fiche.parent2Email]
+        : [fiche.email || fiche.parent1Email || fiche.parent2Email];
+      candidates.forEach(function (raw) {
+        var e = (raw || "").trim();
+        if (e && !seen[e.toLowerCase()]) { seen[e.toLowerCase()] = true; emails.push(e); }
+      });
     });
-    if (!emails.length) { showToast("Aucune adresse email trouvée pour ce groupe"); return; }
-    copyToClipboard(emails.join(", ")).then(function () {
-      showToast(emails.length + " adresse(s) copiée(s) dans le presse-papier");
+    return emails;
+  }
+
+  // Resolves the email list for a modal (m) and stores it as m.emails, then
+  // re-renders — kept as a separate step (rather than copying immediately)
+  // because Safari (and sometimes Chrome) refuses a clipboard write once a
+  // network round-trip has happened since the click: by the time the list
+  // is ready we're no longer inside that "fresh" user gesture. Showing the
+  // result with its own "Copier" button gives the actual write a brand new
+  // click to run from, which always satisfies that requirement.
+  function performCopyEmails(m, scope, mode) {
+    if (scope === "group") {
+      m.emails = emailsFromMemberships(state.memberships, mode);
+      renderModal();
+      return;
+    }
+    var db = requireDb(); if (!db) return;
+    var groupIds = targetGroupIdsForScope(scope);
+    if (!groupIds.length) { m.emails = []; renderModal(); return; }
+    var queries = scope === "all"
+      ? [db.collection("memberships").get()]
+      : groupIds.map(function (id) { return db.collection("memberships").where("groupId", "==", id).get(); });
+    Promise.all(queries).then(function (snaps) {
+      if (state.modal !== m) return; // modal was closed/replaced while this was in flight
+      var memberships = [];
+      snaps.forEach(function (snap) { snap.docs.forEach(function (d) { memberships.push(d.data()); }); });
+      m.emails = emailsFromMemberships(memberships, mode);
+      renderModal();
     }).catch(function () {
-      showToast("Échec de la copie — réessayez");
+      if (state.modal !== m) return;
+      showToast("Échec de la récupération des emails — réessayez");
+      closeModal();
     });
   }
 
@@ -940,7 +985,7 @@
     });
     var html = '<div class="section-head"><span class="count-tag">' + state.students.length + " élève(s)</span>" +
       '<div style="display:flex;gap:8px;">' +
-        '<button class="btn btn-sm" data-action="copy-emails" title="Copie les emails des élèves actifs (ou de leurs parents si l\'élève n\'en a pas) dans le presse-papier">' + ICONS.mail + " Copier les emails</button>" +
+        '<button class="btn btn-sm" data-action="copy-emails">' + ICONS.mail + " Copier les emails</button>" +
         '<button class="btn btn-accent btn-sm" data-action="new-student">' + ICONS.plus + " Ajouter un élève</button>" +
       "</div></div>";
     if (state.students.length > 6) {
@@ -1102,6 +1147,41 @@
         '<div class="field"><label>Nom du nouveau groupe</label><input type="text" id="f-newname" value="' + escapeHtml(m.group.nom) + '"></div>' +
         '<div class="field" style="flex-direction:row;align-items:center;gap:8px;"><input type="checkbox" id="f-carry" checked style="width:auto;"><label style="text-transform:none;font-weight:400;">Copier les élèves actifs dans le nouveau groupe</label></div>' +
         '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-duplicate">Créer</button></div>';
+    }
+    if (m.type === "copy-emails") {
+      var curG = currentGroup();
+      var scopeBtn = function (scope, label) {
+        return '<button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px;" data-action="copy-emails-scope" data-scope="' + scope + '">' + label + "</button>";
+      };
+      if (!m.scope) {
+        return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+          '<div class="field"><label>Quels ateliers ?</label></div>' +
+          scopeBtn("group", "Ce groupe uniquement") +
+          (curG && curG.ville ? scopeBtn("city", "Tous les ateliers de " + escapeHtml(curG.ville)) : "") +
+          scopeBtn("all", "Tous les ateliers") +
+          '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button></div>';
+      }
+      var scopeLabel = m.scope === "group" ? "ce groupe" : (m.scope === "city" ? "les ateliers de " + ((curG && curG.ville) || "") : "tous les ateliers");
+      if (!m.mode) {
+        var modeBtn = function (mode, label) {
+          return '<button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px;" data-action="copy-emails-mode" data-mode="' + mode + '">' + label + "</button>";
+        };
+        return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+          '<p class="inline-note">Portée : ' + escapeHtml(scopeLabel) + "</p>" +
+          modeBtn("student", "Emails élèves (parent en repli si absent)") +
+          modeBtn("all", "Tous les emails (élève + 2 parents)") +
+          '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn" data-action="close-modal">Annuler</button></div>';
+      }
+      if (!m.emails) {
+        return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+          '<p class="inline-note">Recherche en cours…</p>';
+      }
+      return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<p class="inline-note">' + m.emails.length + " adresse(s) trouvée(s) pour " + escapeHtml(scopeLabel) + "." + (m.emails.length ? " Vérifiez la liste puis copiez-la." : "") + "</p>" +
+        (m.emails.length ? '<div class="field"><textarea readonly style="min-height:100px;font-family:var(--font-mono);font-size:13px;">' + escapeHtml(m.emails.join(", ")) + "</textarea></div>" : "") +
+        '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn" data-action="close-modal">Fermer</button>' +
+          (m.emails.length ? '<button class="btn btn-accent" data-action="copy-emails-confirm">Copier</button>' : "") +
+        "</div>";
     }
     if (m.type === "add-student") {
       var alreadyIds = state.students.map(function (x) { return x.id; });
@@ -1388,7 +1468,7 @@
         break;
       }
       case "new-student": openModal({ type: "add-student", query: "" }); break;
-      case "copy-emails": copyGroupEmails(); break;
+      case "copy-emails": openModal({ type: "copy-emails", scope: null }); break;
       case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id), mode: "view" }); break;
       case "new-session": openModal({ type: "session", session: null }); break;
       case "cancel-excuse": cancelExcusedAbsence(btn.dataset.id); break;
@@ -1507,6 +1587,24 @@
       }
       if (action === "add-existing-student") {
         addExistingStudentToGroup(btn.dataset.id);
+        closeModal();
+        return;
+      }
+      if (action === "copy-emails-scope") { m.scope = btn.dataset.scope; renderModal(); return; }
+      if (action === "copy-emails-restart") { m.scope = null; m.mode = null; m.emails = null; renderModal(); return; }
+      if (action === "copy-emails-mode") {
+        m.mode = btn.dataset.mode;
+        renderModal(); // shows "Recherche en cours…" immediately, then performCopyEmails fills m.emails in
+        performCopyEmails(m, m.scope, m.mode);
+        return;
+      }
+      if (action === "copy-emails-confirm") {
+        var emailsToCopy = m.emails || [];
+        copyToClipboard(emailsToCopy.join(", ")).then(function () {
+          showToast(emailsToCopy.length + " adresse(s) copiée(s) dans le presse-papier");
+        }).catch(function () {
+          showToast("Échec de la copie — sélectionnez le texte manuellement");
+        });
         closeModal();
         return;
       }
