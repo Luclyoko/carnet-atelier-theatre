@@ -243,6 +243,8 @@
   .status-btn[data-status="present"].active { background: var(--green-soft); border-color: var(--green); color: var(--green); }
   .status-btn[data-status="retard"].active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
   .status-btn[data-status="absent"].active { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+  .status-btn[data-status="excuse"].active { background: color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); color: var(--accent); }
+  .pill-accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
   .retard-min { width: 64px; font-family: var(--font-mono); }
 
   table.bilan { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -356,13 +358,14 @@
     memberships: [], // this group's membership docs { studentId, groupId, actif, paye }
     students: [], // memberships merged with allStudents, for the CURRENT group only
     sessions: [],
+    excusedAbsences: [], // pending advance-notice absences for the current group { studentId, groupId, date, motif }
     year: localStorage.getItem("atelier.year") || currentSchoolYear(),
     villeFilter: localStorage.getItem("atelier.ville") || "",
     groupId: localStorage.getItem("atelier.groupId") || null,
     tab: "eleves", // eleves | seances | bilan
     studentFilter: "",
-    modal: null, // { type: 'student'|'group'|'session'|'confirm'|'add-student', ... }
-    unsub: { memberships: null, sessions: null }
+    modal: null, // { type: 'student'|'group'|'session'|'confirm'|'add-student'|'excuse-absence', ... }
+    unsub: { memberships: null, sessions: null, excuses: null }
   };
   var modalRenderedFor = null; // tracks which state.modal object the DOM currently reflects
   var appClickBound = false;
@@ -480,9 +483,11 @@
   function subscribeGroup(groupId) {
     if (state.unsub.memberships) state.unsub.memberships();
     if (state.unsub.sessions) state.unsub.sessions();
+    if (state.unsub.excuses) state.unsub.excuses();
     state.memberships = [];
     state.students = [];
     state.sessions = [];
+    state.excusedAbsences = [];
     if (!groupId || !state.db) return;
     state.unsub.memberships = state.db.collection("memberships").where("groupId", "==", groupId).onSnapshot(function (snap) {
       state.memberships = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); });
@@ -494,6 +499,11 @@
     state.unsub.sessions = state.db.collection("sessions").where("groupId", "==", groupId).onSnapshot(function (snap) {
       state.sessions = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
         .sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+      render();
+    });
+    state.unsub.excuses = state.db.collection("excusedAbsences").where("groupId", "==", groupId).onSnapshot(function (snap) {
+      state.excusedAbsences = snap.docs.map(function (d) { return Object.assign({ id: d.id }, d.data()); })
+        .sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); });
       render();
     });
   }
@@ -535,7 +545,7 @@
     return state.students.find(function (s) { return s.id === id; });
   }
   function statsForStudent(studentId) {
-    var present = 0, retard = 0, absent = 0, minutes = 0, total = 0;
+    var present = 0, retard = 0, absent = 0, excuse = 0, minutes = 0, total = 0;
     state.sessions.forEach(function (s) {
       var p = s.presences && s.presences[studentId];
       if (!p) return;
@@ -543,9 +553,13 @@
       if (p.statut === "present") present++;
       else if (p.statut === "retard") { retard++; minutes += Number(p.minutesRetard) || 0; }
       else if (p.statut === "absent") absent++;
+      else if (p.statut === "excuse") excuse++;
     });
-    var rate = total ? Math.round(((present + retard) / total) * 100) : null;
-    return { present: present, retard: retard, absent: absent, minutes: minutes, total: total, rate: rate };
+    // A pre-announced excused absence counts neither for nor against
+    // attendance — only unexplained absences weigh on the rate.
+    var rateBase = present + retard + absent;
+    var rate = rateBase ? Math.round(((present + retard) / rateBase) * 100) : null;
+    return { present: present, retard: retard, absent: absent, excuse: excuse, minutes: minutes, total: total, rate: rate };
   }
 
   // A free trial class is offered before payment is due: unpaid students who
@@ -683,19 +697,48 @@
     }).then(function () { showToast("Fiche supprimée définitivement"); closeModal(); });
   }
 
+  // Once a séance exists for a given date, any advance-notice absences for
+  // that same date have served their purpose (applied as the default status
+  // when the séance was created) — clear them so they stop showing as pending.
+  function resolveExcusedAbsencesForDate(date) {
+    var db = requireDb(); if (!db) return;
+    db.collection("excusedAbsences").where("groupId", "==", state.groupId).where("date", "==", date).get()
+      .then(function (snap) {
+        return Promise.all(snap.docs.map(function (d) { return db.collection("excusedAbsences").doc(d.id).delete(); }));
+      });
+  }
+
   function createSession(data) {
     var db = requireDb(); if (!db) return;
     data.groupId = state.groupId;
     data.creeLe = new Date().toISOString();
-    db.collection("sessions").add(data).then(function () { showToast("Séance enregistrée"); closeModal(); });
+    db.collection("sessions").add(data).then(function () {
+      showToast("Séance enregistrée");
+      resolveExcusedAbsencesForDate(data.date);
+      closeModal();
+    });
   }
   function updateSession(id, patch) {
     var db = requireDb(); if (!db) return;
-    db.collection("sessions").doc(id).update(patch).then(function () { showToast("Séance mise à jour"); });
+    db.collection("sessions").doc(id).update(patch).then(function () {
+      showToast("Séance mise à jour");
+      if (patch.date) resolveExcusedAbsencesForDate(patch.date);
+    });
   }
   function deleteSession(id) {
     var db = requireDb(); if (!db) return;
     db.collection("sessions").doc(id).delete().then(function () { showToast("Séance supprimée"); closeModal(); });
+  }
+
+  function createExcusedAbsence(studentId, date, motif) {
+    var db = requireDb(); if (!db) return;
+    db.collection("excusedAbsences").add({
+      studentId: studentId, groupId: state.groupId, date: date, motif: motif || "", creeLe: new Date().toISOString()
+    }).then(function () { showToast("Absence prévenue"); closeModal(); });
+  }
+  function cancelExcusedAbsence(id) {
+    var db = requireDb(); if (!db) return;
+    db.collection("excusedAbsences").doc(id).delete().then(function () { showToast("Avis d'absence annulé"); });
   }
 
   // ---------------------------------------------------------------------
@@ -878,6 +921,7 @@
           '<div class="student-meta">' +
             '<span class="pill pill-red">' + stats.absent + " abs.</span>" +
             '<span class="pill pill-gold">' + stats.retard + " retard(s)</span>" +
+            (stats.excuse ? '<span class="pill pill-accent">' + stats.excuse + " excusé(s)</span>" : "") +
             (s.actif === false ? '<span class="pill pill-muted">inactif</span>' : "") +
           "</div></button>";
       });
@@ -894,12 +938,23 @@
     var html = '<div class="section-head"><span class="count-tag">' + state.sessions.length + " séance(s)</span>" +
       '<button class="btn btn-accent btn-sm" data-action="new-session"' + (activeStudents.length ? "" : " disabled") + ">" + ICONS.plus + " Faire l'appel</button></div>";
     if (!activeStudents.length) html += '<p class="inline-note">Ajoutez au moins un élève actif avant de créer une séance.</p>';
+    if (state.excusedAbsences.length) {
+      html += '<div class="card" style="margin-bottom:14px;"><div class="field"><label>Absences prévenues à venir</label></div>';
+      state.excusedAbsences.forEach(function (ex) {
+        var st = state.students.find(function (s) { return s.id === ex.studentId; }) ||
+          state.allStudents.find(function (s) { return s.id === ex.studentId; }) || { prenom: "(élève)", nom: "" };
+        html += '<div class="history-item"><span>' + formatDateFR(ex.date) + " — " + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) +
+          (ex.motif ? ' <span class="muted">(' + escapeHtml(ex.motif) + ")</span>" : "") + "</span>" +
+          '<button type="button" class="btn btn-ghost btn-sm" data-action="cancel-excuse" data-id="' + ex.id + '" title="Annuler cet avis">&times;</button></div>';
+      });
+      html += "</div>";
+    }
     if (!state.sessions.length) {
       html += '<div class="empty-state"><p>Aucune séance enregistrée pour ce groupe.</p></div>';
     } else {
       html += '<div class="card">';
       state.sessions.forEach(function (s) {
-        var counts = { present: 0, retard: 0, absent: 0 };
+        var counts = { present: 0, retard: 0, absent: 0, excuse: 0 };
         Object.keys(s.presences || {}).forEach(function (k) { counts[s.presences[k].statut] = (counts[s.presences[k].statut] || 0) + 1; });
         html += '<div class="session-row" data-action="open-session" data-id="' + s.id + '">' +
           '<div class="session-date">' + dowShortFR(s.date) + " " + formatDateFR(s.date) + "</div>" +
@@ -908,6 +963,7 @@
             '<span class="pill pill-green">' + counts.present + "</span>" +
             '<span class="pill pill-gold">' + counts.retard + "</span>" +
             '<span class="pill pill-red">' + counts.absent + "</span>" +
+            (counts.excuse ? '<span class="pill pill-accent">' + counts.excuse + "</span>" : "") +
           "</div></div>";
       });
       html += "</div>";
@@ -925,7 +981,7 @@
       return { s: s, stats: stats };
     }).sort(function (a, b) { return (b.stats.absent + b.stats.retard) - (a.stats.absent + a.stats.retard); });
     var html = '<div class="card bilan-wrap"><table class="bilan"><thead><tr>' +
-      "<th>Élève</th><th class=\"num\">Séances</th><th class=\"num\">Présent</th><th class=\"num\">Retard</th><th class=\"num\">Min. retard</th><th class=\"num\">Absent</th><th>Assiduité</th>" +
+      "<th>Élève</th><th class=\"num\">Séances</th><th class=\"num\">Présent</th><th class=\"num\">Retard</th><th class=\"num\">Min. retard</th><th class=\"num\">Absent</th><th class=\"num\">Excusé</th><th>Assiduité</th>" +
       "</tr></thead><tbody>";
     rows.forEach(function (r) {
       var rate = r.stats.rate == null ? "—" : r.stats.rate + "%";
@@ -936,6 +992,7 @@
         '<td class="num">' + r.stats.retard + "</td>" +
         '<td class="num">' + r.stats.minutes + "</td>" +
         '<td class="num">' + r.stats.absent + "</td>" +
+        '<td class="num">' + r.stats.excuse + "</td>" +
         "<td><span class=\"bar-track\"><span class=\"bar-fill\" style=\"width:" + (r.stats.rate || 0) + "%\"></span></span> <span class=\"count-tag\">" + rate + "</span></td>" +
         "</tr>";
     });
@@ -1018,6 +1075,14 @@
         (candidates.length ? '<div class="field"><label>Élève déjà connu</label><input type="text" id="f-student-search" placeholder="Rechercher parmi les fiches existantes…" value="' + escapeHtml(m.query || "") + '"></div>' : "") +
         (candidates.length ? (rows || '<p class="inline-note">Aucun résultat.</p>') : '<p class="inline-note">Aucune autre fiche élève n\'est encore enregistrée.</p>') +
         '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button></div>';
+    }
+    if (m.type === "excuse-absence") {
+      var exStudent = studentById(m.studentId) || state.allStudents.find(function (s) { return s.id === m.studentId; }) || {};
+      return '<div class="modal-head"><h3>Prévenir d\'une absence</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+        '<p class="inline-note">' + escapeHtml(exStudent.prenom || "") + " " + escapeHtml(upperNom(exStudent.nom || "")) + " sera automatiquement marqué « Excusé » lorsque l'appel sera fait pour cette date.</p>" +
+        '<div class="field"><label>Date de l\'absence</label><input type="date" id="f-excuse-date" min="' + todayISO() + '" value="' + todayISO() + '"></div>' +
+        '<div class="field"><label>Motif (optionnel)</label><textarea id="f-excuse-motif" placeholder="Rendez-vous médical, voyage, …"></textarea></div>' +
+        '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button><button class="btn btn-accent" data-action="save-excuse" data-id="' + m.studentId + '">Enregistrer</button></div>';
     }
     if (m.type === "student") {
       if (m.student && m.mode !== "edit") {
@@ -1114,10 +1179,20 @@
         infoRow("Email", s.parent2Email, s.parent2Email ? "mailto:" + s.parent2Email : null) +
       "</fieldset>" : "";
     var infos = s.infos ? '<div class="divider"></div>' + infoRow("Infos complémentaires", s.infos) : "";
+    var pendingExcuses = state.excusedAbsences.filter(function (ex) { return ex.studentId === s.id; });
+    var excuseSection = pendingExcuses.length ?
+      '<div class="divider"></div><div class="field"><label>Absences prévenues à venir</label></div>' +
+      pendingExcuses.map(function (ex) {
+        return '<div class="history-item"><span>' + formatDateFR(ex.date) + (ex.motif ? " — " + escapeHtml(ex.motif) : "") + '</span><button type="button" class="btn btn-ghost btn-sm" data-action="cancel-excuse" data-id="' + ex.id + '" title="Annuler cet avis">&times;</button></div>';
+      }).join("") : "";
     return '<div class="modal-head"><h3>' + escapeHtml(s.prenom) + " " + escapeHtml(upperNom(s.nom)) + '</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
-      badges + own + parent1 + parent2 + infos +
+      badges + own + parent1 + parent2 + infos + excuseSection +
       renderStudentHistory(s.id) +
-      '<div class="form-actions"><button class="btn" data-action="close-modal">Fermer</button><button class="btn btn-accent" data-action="edit-student">Modifier</button></div>';
+      '<div class="form-actions">' +
+        '<button class="btn" data-action="close-modal">Fermer</button>' +
+        '<button class="btn" data-action="open-excuse-absence" data-id="' + s.id + '">Prévenir d\'une absence</button>' +
+        '<button class="btn btn-accent" data-action="edit-student">Modifier</button>' +
+      "</div>";
   }
 
   function renderStudentHistory(studentId) {
@@ -1126,8 +1201,8 @@
     var html = '<div class="divider"></div><div class="field"><label>Historique des présences</label></div>';
     relevant.slice(0, 12).forEach(function (s) {
       var p = s.presences[studentId];
-      var pillClass = p.statut === "present" ? "pill-green" : (p.statut === "retard" ? "pill-gold" : "pill-red");
-      var label = p.statut === "present" ? "Présent" : (p.statut === "retard" ? ("Retard" + (p.minutesRetard ? " (" + p.minutesRetard + " min)" : "")) : "Absent");
+      var pillClass = p.statut === "present" ? "pill-green" : (p.statut === "retard" ? "pill-gold" : (p.statut === "excuse" ? "pill-accent" : "pill-red"));
+      var label = p.statut === "present" ? "Présent" : (p.statut === "retard" ? ("Retard" + (p.minutesRetard ? " (" + p.minutesRetard + " min)" : "")) : (p.statut === "excuse" ? "Excusé" : "Absent"));
       html += '<div class="history-item"><span>' + formatDateFR(s.date) + '</span><span class="pill ' + pillClass + '">' + label + "</span></div>";
     });
     return html;
@@ -1150,7 +1225,12 @@
       presences = session ? Object.assign({}, session.presences) : {};
       if (isNew) {
         state.students.filter(function (s) { return s.actif !== false; }).forEach(function (s) {
-          presences[s.id] = { statut: "present", minutesRetard: null, commentaire: "" };
+          // A student who was announced absent in advance for this exact date
+          // starts the appel already marked excused, instead of "present".
+          var notice = state.excusedAbsences.find(function (ex) { return ex.studentId === s.id && ex.date === date; });
+          presences[s.id] = notice
+            ? { statut: "excuse", minutesRetard: null, commentaire: notice.motif || "" }
+            : { statut: "present", minutesRetard: null, commentaire: "" };
         });
       }
       m._presences = presences;
@@ -1163,8 +1243,10 @@
         return '<button type="button" class="status-btn' + (p.statut === key ? " active" : "") + '" data-action="set-status" data-student="' + studentId + '" data-status="' + key + '">' + label + "</button>";
       }
       return '<div class="attend-row" data-student-row="' + studentId + '">' +
-        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) + "</span>" +
-        '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + "</div>" +
+        '<span class="attend-name">' + escapeHtml(st.prenom) + " " + escapeHtml(upperNom(st.nom)) +
+          (p.statut === "excuse" && p.commentaire ? ' <span class="muted" style="font-weight:400;font-size:12px;">(' + escapeHtml(p.commentaire) + ")</span>" : "") +
+        "</span>" +
+        '<div class="status-toggle">' + sb("present", "Présent") + sb("retard", "Retard") + sb("absent", "Absent") + sb("excuse", "Excusé") + "</div>" +
         (p.statut === "retard" ? '<input type="number" min="0" class="retard-min" placeholder="min" data-action="set-retard-min" data-student="' + studentId + '" value="' + (p.minutesRetard || "") + '">' : "") +
         '<button type="button" class="btn btn-ghost btn-sm" data-action="remove-from-session" data-student="' + studentId + '" title="Retirer de cette séance">&times;</button>' +
         "</div>";
@@ -1264,6 +1346,7 @@
       case "new-student": openModal({ type: "add-student", query: "" }); break;
       case "open-student": openModal({ type: "student", student: studentById(btn.dataset.id), mode: "view" }); break;
       case "new-session": openModal({ type: "session", session: null }); break;
+      case "cancel-excuse": cancelExcusedAbsence(btn.dataset.id); break;
       case "open-session": {
         var s = state.sessions.find(function (x) { return x.id === btn.dataset.id; });
         openModal({ type: "session", session: s });
@@ -1380,6 +1463,21 @@
       if (action === "add-existing-student") {
         addExistingStudentToGroup(btn.dataset.id);
         closeModal();
+        return;
+      }
+      if (action === "open-excuse-absence") {
+        openModal({ type: "excuse-absence", studentId: btn.dataset.id });
+        return;
+      }
+      if (action === "save-excuse") {
+        var exDate = document.getElementById("f-excuse-date").value;
+        if (!exDate) { showToast("Choisissez une date"); return; }
+        var exMotif = document.getElementById("f-excuse-motif").value.trim();
+        createExcusedAbsence(btn.dataset.id, exDate, exMotif);
+        return;
+      }
+      if (action === "cancel-excuse") {
+        cancelExcusedAbsence(btn.dataset.id);
         return;
       }
       if (action === "set-status") {
