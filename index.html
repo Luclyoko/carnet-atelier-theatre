@@ -2,6 +2,15 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
+<script>
+  // Clickjacking guard: GitHub Pages can't set X-Frame-Options/CSP frame-ancestors
+  // via HTTP headers, so break out of any iframe at the JS level instead — a
+  // page embedding this one in secret to trick a logged-in user into clicking
+  // something (e.g. a delete button) loses that trick as soon as this runs.
+  if (window.top !== window.self) {
+    window.top.location = window.self.location.href;
+  }
+</script>
 <title>Carnet d'atelier — Théâtre</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
