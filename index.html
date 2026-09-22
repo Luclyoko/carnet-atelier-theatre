@@ -512,7 +512,12 @@
         actif: mem.actif,
         paye: mem.paye
       });
-    }).sort(function (a, b) { return ((a.nom || "") + (a.prenom || "")).localeCompare((b.nom || "") + (b.prenom || ""), "fr"); });
+    }).sort(function (a, b) {
+      var aInactive = a.actif === false ? 1 : 0;
+      var bInactive = b.actif === false ? 1 : 0;
+      if (aInactive !== bInactive) return aInactive - bInactive; // active students first, inactive after, never interleaved
+      return ((a.nom || "") + (a.prenom || "")).localeCompare((b.nom || "") + (b.prenom || ""), "fr");
+    });
   }
 
   function subscribeGroup(groupId) {
