@@ -946,15 +946,39 @@
   // Mode: "student" = student's own email, or a parent's as a fallback when
   // the student has none; "all" = every address on file (student + both
   // parents), for a wider reach.
-  function emailsFromMemberships(memberships, mode) {
+  // Default filters replicate the original, pre-"filtre avancé" behaviour:
+  // active students only, no age bound, any payment status.
+  var DEFAULT_EMAIL_FILTERS = { statut: "actif", ageMin: null, ageMax: null, paiement: "tous" };
+
+  function describeEmailFilters(filters) {
+    var parts = [];
+    if (filters.statut === "inactif") parts.push("inactifs seulement");
+    else if (filters.statut === "tous") parts.push("actifs + inactifs");
+    if (filters.ageMin != null && filters.ageMax != null) parts.push(filters.ageMin + "-" + filters.ageMax + " ans");
+    else if (filters.ageMin != null) parts.push("≥ " + filters.ageMin + " ans");
+    else if (filters.ageMax != null) parts.push("≤ " + filters.ageMax + " ans");
+    if (filters.paiement === "paye") parts.push("a réglé l'année");
+    else if (filters.paiement === "nonpaye") parts.push("n'a pas réglé l'année");
+    return parts.length ? "filtres : " + parts.join(", ") : "";
+  }
+
+  function emailsFromMemberships(memberships, mode, filters) {
+    filters = filters || DEFAULT_EMAIL_FILTERS;
     // `seen` spans the whole loop (not reset per student), so an address
     // shared across fiches — e.g. siblings using the same parent email —
     // is still only added once to the final list.
     var seen = {};
     var emails = [];
-    memberships.filter(function (m) { return m.actif !== false; }).forEach(function (m) {
+    memberships.forEach(function (m) {
+      var isActif = m.actif !== false;
+      if (filters.statut === "actif" && !isActif) return;
+      if (filters.statut === "inactif" && isActif) return;
+      if (filters.paiement === "paye" && !m.paye) return;
+      if (filters.paiement === "nonpaye" && m.paye) return;
       var fiche = state.allStudents.find(function (s) { return s.id === m.studentId; });
       if (!fiche) return;
+      if (filters.ageMin != null && (fiche.age == null || fiche.age < filters.ageMin)) return;
+      if (filters.ageMax != null && (fiche.age == null || fiche.age > filters.ageMax)) return;
       var candidates = mode === "all"
         ? [fiche.email, fiche.parent1Email, fiche.parent2Email]
         : [fiche.email || fiche.parent1Email || fiche.parent2Email];
@@ -975,7 +999,7 @@
   // click to run from, which always satisfies that requirement.
   function performCopyEmails(m, scope, mode) {
     if (scope === "group") {
-      m.emails = emailsFromMemberships(state.memberships, mode);
+      m.emails = emailsFromMemberships(state.memberships, mode, m.filters);
       renderModal();
       return;
     }
@@ -989,7 +1013,7 @@
       if (state.modal !== m) return; // modal was closed/replaced while this was in flight
       var memberships = [];
       snaps.forEach(function (snap) { snap.docs.forEach(function (d) { memberships.push(d.data()); }); });
-      m.emails = emailsFromMemberships(memberships, mode);
+      m.emails = emailsFromMemberships(memberships, mode, m.filters);
       renderModal();
     }).catch(function () {
       if (state.modal !== m) return;
@@ -1174,21 +1198,50 @@
       var scopeBtn = function (scope, label) {
         return '<button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px;" data-action="copy-emails-scope" data-scope="' + scope + '">' + label + "</button>";
       };
+      if (m.showFilters) {
+        var fs = m.filters || {};
+        var villeOpt = curG && curG.ville
+          ? '<option value="city"' + (fs.scope === "city" ? " selected" : "") + ">Tous les ateliers de " + escapeHtml(curG.ville) + "</option>"
+          : "";
+        return '<div class="modal-head"><h3>Filtre avancé</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
+          '<div class="field"><label>Quels ateliers ?</label><select id="f-filter-scope">' +
+            '<option value="group"' + (fs.scope === "group" ? " selected" : "") + ">Ce groupe uniquement</option>" +
+            villeOpt +
+            '<option value="all"' + (!fs.scope || fs.scope === "all" ? " selected" : "") + ">Tous les ateliers</option>" +
+          "</select></div>" +
+          '<div class="field"><label>Statut de l\'élève</label><select id="f-filter-statut">' +
+            '<option value="actif"' + (!fs.statut || fs.statut === "actif" ? " selected" : "") + ">Actifs seulement</option>" +
+            '<option value="inactif"' + (fs.statut === "inactif" ? " selected" : "") + ">Inactifs seulement</option>" +
+            '<option value="tous"' + (fs.statut === "tous" ? " selected" : "") + ">Tous (actifs + inactifs)</option>" +
+          "</select></div>" +
+          '<div class="field-row"><div class="field"><label>Âge minimum</label><input type="number" min="0" max="99" id="f-filter-age-min" value="' + (fs.ageMin != null ? fs.ageMin : "") + '"></div>' +
+          '<div class="field"><label>Âge maximum</label><input type="number" min="0" max="99" id="f-filter-age-max" value="' + (fs.ageMax != null ? fs.ageMax : "") + '"></div></div>' +
+          '<div class="field"><label>Paiement</label><select id="f-filter-paiement">' +
+            '<option value="tous"' + (!fs.paiement || fs.paiement === "tous" ? " selected" : "") + ">Tous</option>" +
+            '<option value="paye"' + (fs.paiement === "paye" ? " selected" : "") + ">A réglé l'année uniquement</option>" +
+            '<option value="nonpaye"' + (fs.paiement === "nonpaye" ? " selected" : "") + ">N'a pas réglé l'année uniquement</option>" +
+          "</select></div>" +
+          '<p class="inline-note">L\'âge et le statut viennent de la fiche/inscription de l\'élève. Le paiement se base sur la case « A réglé l\'année », sans distinguer l\'essai gratuit ici.</p>' +
+          '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn btn-accent" data-action="copy-emails-apply-filters">Appliquer</button></div>';
+      }
       if (!m.scope) {
         return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
           '<div class="field"><label>Quels ateliers ?</label></div>' +
           scopeBtn("group", "Ce groupe uniquement") +
           (curG && curG.ville ? scopeBtn("city", "Tous les ateliers de " + escapeHtml(curG.ville)) : "") +
           scopeBtn("all", "Tous les ateliers") +
+          '<div class="divider"></div>' +
+          '<button type="button" class="btn" style="width:100%;justify-content:flex-start;" data-action="copy-emails-open-filters">Filtre avancé…</button>' +
           '<div class="form-actions"><button class="btn" data-action="close-modal">Annuler</button></div>';
       }
       var scopeLabel = m.scope === "group" ? "ce groupe" : (m.scope === "city" ? "les ateliers de " + ((curG && curG.ville) || "") : "tous les ateliers");
+      var filterSummary = m.filters ? describeEmailFilters(m.filters) : "";
       if (!m.mode) {
         var modeBtn = function (mode, label) {
           return '<button type="button" class="btn" style="width:100%;justify-content:flex-start;margin-bottom:8px;" data-action="copy-emails-mode" data-mode="' + mode + '">' + label + "</button>";
         };
         return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
-          '<p class="inline-note">Portée : ' + escapeHtml(scopeLabel) + "</p>" +
+          '<p class="inline-note">Portée : ' + escapeHtml(scopeLabel) + (filterSummary ? " — " + escapeHtml(filterSummary) : "") + "</p>" +
           modeBtn("student", "Emails élèves (parent en repli si absent)") +
           modeBtn("all", "Tous les emails (élève + 2 parents)") +
           '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn" data-action="close-modal">Annuler</button></div>';
@@ -1198,7 +1251,7 @@
           '<p class="inline-note">Recherche en cours…</p>';
       }
       return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
-        '<p class="inline-note">' + m.emails.length + " adresse(s) trouvée(s) pour " + escapeHtml(scopeLabel) + "." + (m.emails.length ? " Vérifiez la liste puis copiez-la." : "") + "</p>" +
+        '<p class="inline-note">' + m.emails.length + " adresse(s) trouvée(s) pour " + escapeHtml(scopeLabel) + (filterSummary ? " — " + escapeHtml(filterSummary) : "") + "." + (m.emails.length ? " Vérifiez la liste puis copiez-la." : "") + "</p>" +
         (m.emails.length ? '<div class="field"><textarea readonly style="min-height:100px;font-family:var(--font-mono);font-size:13px;">' + escapeHtml(m.emails.join(", ")) + "</textarea></div>" : "") +
         '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn" data-action="close-modal">Fermer</button>' +
           (m.emails.length ? '<button class="btn btn-accent" data-action="copy-emails-confirm">Copier</button>' : "") +
@@ -1631,7 +1684,31 @@
         return;
       }
       if (action === "copy-emails-scope") { m.scope = btn.dataset.scope; renderModal(); return; }
-      if (action === "copy-emails-restart") { m.scope = null; m.mode = null; m.emails = null; renderModal(); return; }
+      if (action === "copy-emails-open-filters") {
+        m.showFilters = true;
+        m.filters = m.filters || Object.assign({}, DEFAULT_EMAIL_FILTERS);
+        renderModal();
+        return;
+      }
+      if (action === "copy-emails-apply-filters") {
+        var ageMinVal = document.getElementById("f-filter-age-min").value;
+        var ageMaxVal = document.getElementById("f-filter-age-max").value;
+        m.scope = document.getElementById("f-filter-scope").value;
+        m.filters = {
+          statut: document.getElementById("f-filter-statut").value,
+          ageMin: ageMinVal ? parseInt(ageMinVal, 10) : null,
+          ageMax: ageMaxVal ? parseInt(ageMaxVal, 10) : null,
+          paiement: document.getElementById("f-filter-paiement").value
+        };
+        m.showFilters = false;
+        renderModal();
+        return;
+      }
+      if (action === "copy-emails-restart") {
+        m.scope = null; m.mode = null; m.emails = null; m.showFilters = false; m.filters = null;
+        renderModal();
+        return;
+      }
       if (action === "copy-emails-mode") {
         m.mode = btn.dataset.mode;
         renderModal(); // shows "Recherche en cours…" immediately, then performCopyEmails fills m.emails in
