@@ -979,9 +979,10 @@
       if (!fiche) return;
       if (filters.ageMin != null && (fiche.age == null || fiche.age < filters.ageMin)) return;
       if (filters.ageMax != null && (fiche.age == null || fiche.age > filters.ageMax)) return;
-      var candidates = mode === "all"
-        ? [fiche.email, fiche.parent1Email, fiche.parent2Email]
-        : [fiche.email || fiche.parent1Email || fiche.parent2Email];
+      var candidates = mode === "all" ? [fiche.email, fiche.parent1Email, fiche.parent2Email]
+        : mode === "parents" ? [fiche.parent1Email, fiche.parent2Email]
+        : mode === "firstparent" ? [fiche.parent1Email || fiche.parent2Email]
+        : [fiche.email || fiche.parent1Email || fiche.parent2Email]; // "student" (default)
       candidates.forEach(function (raw) {
         var e = (raw || "").trim();
         if (e && !seen[e.toLowerCase()]) { seen[e.toLowerCase()] = true; emails.push(e); }
@@ -1243,6 +1244,8 @@
         return '<div class="modal-head"><h3>Copier les emails</h3><button class="modal-close" data-action="close-modal">&times;</button></div>' +
           '<p class="inline-note">Portée : ' + escapeHtml(scopeLabel) + (filterSummary ? " — " + escapeHtml(filterSummary) : "") + "</p>" +
           modeBtn("student", "Emails élèves (parent en repli si absent)") +
+          modeBtn("parents", "Emails des parents uniquement (les deux si renseignés)") +
+          modeBtn("firstparent", "Email du premier parent renseigné uniquement") +
           modeBtn("all", "Tous les emails (élève + 2 parents)") +
           '<div class="form-actions"><button class="btn btn-ghost btn-sm" data-action="copy-emails-restart">&larr; Retour</button><button class="btn" data-action="close-modal">Annuler</button></div>';
       }
